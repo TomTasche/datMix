@@ -2,12 +2,20 @@ package at.tomtasche.datmix;
 
 import android.app.Fragment;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.util.Log;
 
 import com.spotify.sdk.android.Spotify;
 import com.spotify.sdk.android.playback.ConnectionStateCallback;
 import com.spotify.sdk.android.playback.Player;
 import com.spotify.sdk.android.playback.PlayerNotificationCallback;
+import com.wrapper.spotify.Api;
+import com.wrapper.spotify.methods.CurrentUserRequest;
+import com.wrapper.spotify.methods.UserPlaylistsRequest;
+import com.wrapper.spotify.models.Page;
+import com.wrapper.spotify.models.SimplePlaylist;
+import com.wrapper.spotify.models.User;
 
 public class MixFragment extends Fragment implements
 		PlayerNotificationCallback, ConnectionStateCallback,
@@ -15,7 +23,14 @@ public class MixFragment extends Fragment implements
 
 	private static final String ARGUMENT_ACCESS_TOKEN = "access_token";
 
+	private HandlerThread handlerThread;
+
+	private Handler handler;
+
+	private Spotify spotify;
 	private Player player;
+
+	private Api api;
 
 	public static MixFragment newInstance(String accessToken) {
 		MixFragment mixFragment = new MixFragment();
@@ -33,9 +48,18 @@ public class MixFragment extends Fragment implements
 		super.onCreate(savedInstanceState);
 
 		String accessToken = getArguments().getString(ARGUMENT_ACCESS_TOKEN);
-		Spotify spotify = new Spotify(accessToken);
+		spotify = new Spotify(accessToken);
 
-		player = spotify.getPlayer(getActivity(), "DatMix", this, this);
+		player = spotify.getPlayer(getActivity(), "datMix", this, this);
+
+		handlerThread = new HandlerThread("spotify-thread");
+		handlerThread.start();
+
+		handler = new Handler(handlerThread.getLooper());
+
+		api = Api.builder().clientId(AuthenticationUtil.CLIENT_ID)
+				.clientSecret("5387f3eee6ae4395bfdf503200c0ffdf")
+				.accessToken(accessToken).build();
 	}
 
 	@Override
@@ -43,9 +67,31 @@ public class MixFragment extends Fragment implements
 		player.addConnectionStateCallback(this);
 		player.addPlayerNotificationCallback(this);
 
-		player.setShuffle(true);
+		handler.post(new Runnable() {
 
-		player.play("spotify:user:1149138533:playlist:54yXJVZs8TaF8YpOwvQ2In");
+			@Override
+			public void run() {
+				try {
+					CurrentUserRequest userRequest = api.getMe().build();
+					User user = userRequest.get();
+					String userId = user.getId();
+
+					Log.e("spoti", userId);
+
+					UserPlaylistsRequest request = api.getPlaylistsForUser(
+							userId).build();
+					Page<SimplePlaylist> playlists = request.get();
+					for (SimplePlaylist playlist : playlists.getItems()) {
+						Log.e("spoti", playlist.getName());
+					}
+
+					String playlistUri = playlists.getItems().get(0).getUri();
+					player.play(playlistUri);
+				} catch (Exception e) {
+					Log.e("spoti", "something went wrong!", e);
+				}
+			}
+		});
 	}
 
 	@Override
