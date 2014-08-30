@@ -1,12 +1,19 @@
 package at.tomtasche.datmix;
 
 import android.app.Activity;
+import android.app.Fragment;
 import android.app.FragmentTransaction;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import at.tomtasche.datmix.PlaylistsFragment.PlaylistListener;
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements PlaylistListener {
+
+	private static final String FRAGMENT_TAG_PLAYLISTS = "playlists";
+	private static final String FRAGMENT_TAG_MIX = "mix";
+
+	private String accessToken;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -21,14 +28,36 @@ public class MainActivity extends Activity {
 
 		Uri uri = intent.getData();
 		if (uri != null) {
-			String accessToken = AuthenticationUtil.finishAuthentication(uri);
+			accessToken = AuthenticationUtil.finishAuthentication(uri);
 
-			MixFragment mixFragment = MixFragment.newInstance(accessToken);
+			PlaylistsFragment playlistsFragment = PlaylistsFragment
+					.newInstance(accessToken);
 
 			FragmentTransaction transaction = getFragmentManager()
 					.beginTransaction();
-			transaction.add(android.R.id.content, mixFragment);
+			transaction.add(android.R.id.content, playlistsFragment,
+					FRAGMENT_TAG_PLAYLISTS);
 			transaction.commit();
 		}
+	}
+
+	@Override
+	public void onPlaylistSelected(String playlistUri) {
+		Fragment playlistsFragment = getFragmentManager().findFragmentByTag(
+				FRAGMENT_TAG_PLAYLISTS);
+		if (playlistsFragment == null) {
+			throw new IllegalStateException("playlist-fragment missing");
+		}
+
+		MixFragment mixFragment = MixFragment.newInstance(accessToken,
+				playlistUri);
+
+		FragmentTransaction transaction = getFragmentManager()
+				.beginTransaction();
+		transaction.remove(playlistsFragment);
+		transaction.add(mixFragment, FRAGMENT_TAG_MIX);
+		transaction.addToBackStack(FRAGMENT_TAG_PLAYLISTS + "-to-"
+				+ FRAGMENT_TAG_MIX);
+		transaction.commit();
 	}
 }

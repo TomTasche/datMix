@@ -2,41 +2,31 @@ package at.tomtasche.datmix;
 
 import android.app.Fragment;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.HandlerThread;
 import android.util.Log;
 
 import com.spotify.sdk.android.Spotify;
 import com.spotify.sdk.android.playback.ConnectionStateCallback;
 import com.spotify.sdk.android.playback.Player;
 import com.spotify.sdk.android.playback.PlayerNotificationCallback;
-import com.wrapper.spotify.Api;
-import com.wrapper.spotify.methods.CurrentUserRequest;
-import com.wrapper.spotify.methods.UserPlaylistsRequest;
-import com.wrapper.spotify.models.Page;
-import com.wrapper.spotify.models.SimplePlaylist;
-import com.wrapper.spotify.models.User;
 
 public class MixFragment extends Fragment implements
 		PlayerNotificationCallback, ConnectionStateCallback,
 		Player.InitializationObserver {
 
-	private static final String ARGUMENT_ACCESS_TOKEN = "access_token";
+	private static final String EXTRA_PLAYLIST_URI = "playlist_uri";
 
-	private HandlerThread handlerThread;
+	private SpotifyBridge spotifyBridge;
 
-	private Handler handler;
+	private String playlistUri;
 
-	private Spotify spotify;
 	private Player player;
 
-	private Api api;
-
-	public static MixFragment newInstance(String accessToken) {
+	public static MixFragment newInstance(String accessToken, String playlistUri) {
 		MixFragment mixFragment = new MixFragment();
 
 		Bundle args = new Bundle();
-		args.putString(ARGUMENT_ACCESS_TOKEN, accessToken);
+		args.putString(SpotifyBridge.EXTRA_ACCESS_TOKEN, accessToken);
+		args.putString(EXTRA_PLAYLIST_URI, playlistUri);
 
 		mixFragment.setArguments(args);
 
@@ -47,19 +37,12 @@ public class MixFragment extends Fragment implements
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 
-		String accessToken = getArguments().getString(ARGUMENT_ACCESS_TOKEN);
-		spotify = new Spotify(accessToken);
+		spotifyBridge = new SpotifyBridge(getArguments());
 
-		player = spotify.getPlayer(getActivity(), "datMix", this, this);
+		playlistUri = getArguments().getString(EXTRA_PLAYLIST_URI);
 
-		handlerThread = new HandlerThread("spotify-thread");
-		handlerThread.start();
-
-		handler = new Handler(handlerThread.getLooper());
-
-		api = Api.builder().clientId(AuthenticationUtil.CLIENT_ID)
-				.clientSecret("5387f3eee6ae4395bfdf503200c0ffdf")
-				.accessToken(accessToken).build();
+		player = spotifyBridge.getSpotify().getPlayer(getActivity(), "datMix",
+				this, this);
 	}
 
 	@Override
@@ -67,31 +50,7 @@ public class MixFragment extends Fragment implements
 		player.addConnectionStateCallback(this);
 		player.addPlayerNotificationCallback(this);
 
-		handler.post(new Runnable() {
-
-			@Override
-			public void run() {
-				try {
-					CurrentUserRequest userRequest = api.getMe().build();
-					User user = userRequest.get();
-					String userId = user.getId();
-
-					Log.e("spoti", userId);
-
-					UserPlaylistsRequest request = api.getPlaylistsForUser(
-							userId).build();
-					Page<SimplePlaylist> playlists = request.get();
-					for (SimplePlaylist playlist : playlists.getItems()) {
-						Log.e("spoti", playlist.getName());
-					}
-
-					String playlistUri = playlists.getItems().get(0).getUri();
-					player.play(playlistUri);
-				} catch (Exception e) {
-					Log.e("spoti", "something went wrong!", e);
-				}
-			}
-		});
+		player.play(playlistUri);
 	}
 
 	@Override
@@ -128,6 +87,10 @@ public class MixFragment extends Fragment implements
 	@Override
 	public void onPlaybackEvent(EventType eventType) {
 		Log.d("MainActivity", "Playback event received: " + eventType.name());
+
+		if (eventType == EventType.PLAY) {
+			player.setShuffle(true);
+		}
 	}
 
 	@Override
