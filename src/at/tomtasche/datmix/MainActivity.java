@@ -42,7 +42,7 @@ public class MainActivity extends Activity implements PlaylistListener {
 	}
 
 	@Override
-	public void onPlaylistSelected(String playlistUri) {
+	public void onPlaylistSelected(String playlistId) {
 		Fragment playlistsFragment = getFragmentManager().findFragmentByTag(
 				FRAGMENT_TAG_PLAYLISTS);
 		if (playlistsFragment == null) {
@@ -50,12 +50,12 @@ public class MainActivity extends Activity implements PlaylistListener {
 		}
 
 		MixFragment mixFragment = MixFragment.newInstance(accessToken,
-				playlistUri);
+				playlistId);
 
 		FragmentTransaction transaction = getFragmentManager()
 				.beginTransaction();
 		transaction.remove(playlistsFragment);
-		transaction.add(mixFragment, FRAGMENT_TAG_MIX);
+		transaction.add(android.R.id.content, mixFragment, FRAGMENT_TAG_MIX);
 		transaction.addToBackStack(FRAGMENT_TAG_PLAYLISTS + "-to-"
 				+ FRAGMENT_TAG_MIX);
 		transaction.commit();

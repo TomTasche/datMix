@@ -24,7 +24,7 @@ import com.wrapper.spotify.models.User;
 public class PlaylistsFragment extends ListFragment implements
 		OnItemClickListener {
 
-	private HandlerThread handlerThread;
+	private HandlerThread backgroundThread;
 
 	private Handler backgroundHandler;
 	private Handler mainHandler;
@@ -34,7 +34,7 @@ public class PlaylistsFragment extends ListFragment implements
 	private PlaylistListener listener;
 
 	private List<String> playlistNames;
-	private List<String> playlistUris;
+	private List<String> playlistIds;
 
 	private ArrayAdapter<String> adapter;
 
@@ -51,17 +51,17 @@ public class PlaylistsFragment extends ListFragment implements
 
 	public PlaylistsFragment() {
 		playlistNames = new LinkedList<String>();
-		playlistUris = new LinkedList<String>();
+		playlistIds = new LinkedList<String>();
 	}
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 
-		handlerThread = new HandlerThread("spotify-thread");
-		handlerThread.start();
+		backgroundThread = new HandlerThread("spotify-thread");
+		backgroundThread.start();
 
-		backgroundHandler = new Handler(handlerThread.getLooper());
+		backgroundHandler = new Handler(backgroundThread.getLooper());
 		mainHandler = new Handler();
 
 		spotifyBridge = new SpotifyBridge(getArguments());
@@ -82,7 +82,7 @@ public class PlaylistsFragment extends ListFragment implements
 					Page<SimplePlaylist> playlists = request.get();
 					for (SimplePlaylist playlist : playlists.getItems()) {
 						playlistNames.add(playlist.getName());
-						playlistUris.add(playlist.getUri());
+						playlistIds.add(playlist.getId());
 					}
 
 					if (adapter != null) {
@@ -105,11 +105,15 @@ public class PlaylistsFragment extends ListFragment implements
 	public void onActivityCreated(Bundle savedInstanceState) {
 		super.onActivityCreated(savedInstanceState);
 
+		getActivity().setTitle("Choose a playlist");
+
 		adapter = new ArrayAdapter<String>(getActivity(),
 				android.R.layout.simple_list_item_1, android.R.id.text1,
 				playlistNames);
 
 		setListAdapter(adapter);
+
+		setEmptyText("Loading...");
 
 		getListView().setOnItemClickListener(this);
 	}
@@ -129,12 +133,19 @@ public class PlaylistsFragment extends ListFragment implements
 	@Override
 	public void onItemClick(AdapterView<?> parent, View view, int position,
 			long id) {
-		String playlistUri = playlistUris.get(position);
-		listener.onPlaylistSelected(playlistUri);
+		String playlistId = playlistIds.get(position);
+		listener.onPlaylistSelected(playlistId);
+	}
+
+	@Override
+	public void onStop() {
+		super.onStop();
+
+		backgroundThread.quit();
 	}
 
 	public interface PlaylistListener {
 
-		public void onPlaylistSelected(String playlistUri);
+		public void onPlaylistSelected(String playlistId);
 	}
 }
