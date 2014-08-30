@@ -1,5 +1,6 @@
 package at.tomtasche.datmix;
 
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -44,6 +45,8 @@ public class MixFragment extends ListFragment implements
 	private List<String> trackUris;
 
 	private ArrayAdapter<String> adapter;
+
+	private int currentTrackPlayingIndex;
 
 	public static MixFragment newInstance(String accessToken, String playlistId) {
 		MixFragment mixFragment = new MixFragment();
@@ -99,12 +102,17 @@ public class MixFragment extends ListFragment implements
 						trackUris.add(track.getTrack().getUri());
 					}
 
+					Collections.reverse(trackNames);
+					Collections.reverse(trackUris);
+
 					if (adapter != null) {
 						mainHandler.post(new Runnable() {
 
 							@Override
 							public void run() {
 								adapter.notifyDataSetChanged();
+
+								playTrack(0);
 							}
 						});
 					}
@@ -142,8 +150,14 @@ public class MixFragment extends ListFragment implements
 	@Override
 	public void onItemClick(AdapterView<?> parent, View view, int position,
 			long id) {
+		playTrack(position);
+	}
+
+	private void playTrack(int position) {
 		String trackUri = trackUris.get(position);
 		player.play(trackUri);
+
+		currentTrackPlayingIndex = position;
 	}
 
 	@Override
@@ -187,8 +201,7 @@ public class MixFragment extends ListFragment implements
 	public void onPlaybackEvent(EventType eventType) {
 		Log.d("MainActivity", "Playback event received: " + eventType.name());
 
-		if (eventType == EventType.PLAY) {
-			player.setShuffle(true);
+		if (eventType == EventType.BECAME_INACTIVE) {
 		}
 	}
 
