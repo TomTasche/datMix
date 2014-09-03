@@ -46,8 +46,6 @@ public class MixFragment extends ListFragment implements
 
 	private ArrayAdapter<String> adapter;
 
-	private int currentTrackPlayingIndex;
-
 	public static MixFragment newInstance(String accessToken, String playlistId) {
 		MixFragment mixFragment = new MixFragment();
 
@@ -112,7 +110,7 @@ public class MixFragment extends ListFragment implements
 							public void run() {
 								adapter.notifyDataSetChanged();
 
-								playTrack(0);
+								startPlaying(0, true);
 							}
 						});
 					}
@@ -138,6 +136,9 @@ public class MixFragment extends ListFragment implements
 		setEmptyText("Loading...");
 
 		getListView().setOnItemClickListener(this);
+
+		// TODO: only while playing
+		getListView().setKeepScreenOn(true);
 	}
 
 	@Override
@@ -150,14 +151,19 @@ public class MixFragment extends ListFragment implements
 	@Override
 	public void onItemClick(AdapterView<?> parent, View view, int position,
 			long id) {
-		playTrack(position);
+		startPlaying(position, true);
 	}
 
-	private void playTrack(int position) {
-		String trackUri = trackUris.get(position);
-		player.play(trackUri);
+	private void startPlaying(int position, boolean force) {
+		queueTrack(position, force);
+		for (int i = position + 1; i < trackUris.size(); i++) {
+			queueTrack(i, false);
+		}
+	}
 
-		currentTrackPlayingIndex = position;
+	private void queueTrack(int position, boolean force) {
+		String trackUri = trackUris.get(position);
+		player.queue(trackUri, force);
 	}
 
 	@Override
