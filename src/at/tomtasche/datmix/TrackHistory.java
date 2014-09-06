@@ -6,6 +6,7 @@ public class TrackHistory extends SugarRecord<TrackHistory> {
 
 	private String spotifyUri;
 	private int playCount;
+	private int skipCount;
 
 	public TrackHistory() {
 	}
@@ -14,17 +15,26 @@ public class TrackHistory extends SugarRecord<TrackHistory> {
 		this.spotifyUri = spotifyUri;
 
 		playCount = 0;
+		skipCount = 0;
 	}
 
 	public synchronized void increasePlayCount() {
 		playCount++;
 	}
 
-	public int getPlayCount() {
-		return playCount;
+	public synchronized void increaseSkipCount() {
+		skipCount++;
 	}
 
 	public String getSpotifyUri() {
 		return spotifyUri;
+	}
+
+	public int getPlayCount() {
+		return playCount;
+	}
+
+	public int getSkipCount() {
+		return skipCount;
 	}
 }

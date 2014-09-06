@@ -10,6 +10,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ArrayAdapter;
@@ -27,7 +28,7 @@ import com.wrapper.spotify.models.User;
 
 public class MixFragment extends ListFragment implements
 		PlayerNotificationCallback, ConnectionStateCallback,
-		Player.InitializationObserver, OnItemClickListener {
+		Player.InitializationObserver, OnItemClickListener, OnClickListener {
 
 	private static final String LOG_TAG = "datMix";
 
@@ -143,6 +144,12 @@ public class MixFragment extends ListFragment implements
 
 		// TODO: only while playing
 		getListView().setKeepScreenOn(true);
+
+		View buttonBar = getActivity().getLayoutInflater().inflate(
+				R.layout.button_bar, null);
+		buttonBar.findViewById(R.id.button_pause).setOnClickListener(this);
+		buttonBar.findViewById(R.id.button_skip).setOnClickListener(this);
+		getListView().addFooterView(buttonBar);
 	}
 
 	@Override
@@ -158,57 +165,53 @@ public class MixFragment extends ListFragment implements
 		startPlaying(position);
 	}
 
+	@Override
+	public void onClick(View v) {
+		switch (v.getId()) {
+		case R.id.button_pause:
+			if (player.isPlaying()) {
+				player.pause();
+			} else {
+				player.resume();
+			}
+
+			break;
+		case R.id.button_skip:
+			startPlaying(currentlyPlayingIndex + 1);
+
+			break;
+		default:
+			break;
+		}
+	}
+
 	private void startPlaying(int position) {
 		// hack because we don't have proper callbacks for the currently playing
 		// song right now
 		currentlyPlayingIndex = position - 1;
 
-		queueTrack(position, true);
-		for (int i = position + 1; i < trackUris.size(); i++) {
-			queueTrack(i, false);
-		}
+		playTrack(position);
 	}
 
-	private void queueTrack(int position, boolean force) {
+	private void queueTrack(int position) {
 		String trackUri = trackUris.get(position);
-		player.queue(trackUri, force);
+		Log.d(LOG_TAG, "queuing track with name " + trackNames.get(position));
+
+		player.clearQueue();
+		player.queue(trackUri);
+	}
+
+	private void playTrack(int position) {
+		String trackUri = trackUris.get(position);
+		Log.d(LOG_TAG, "playing track with name " + trackNames.get(position));
+
+		player.play(trackUri);
 	}
 
 	@Override
 	public void onInitialized() {
 		player.addConnectionStateCallback(this);
 		player.addPlayerNotificationCallback(this);
-	}
-
-	@Override
-	public void onError(Throwable throwable) {
-		Log.e(LOG_TAG,
-				"Could not initialize player: " + throwable.getMessage());
-	}
-
-	@Override
-	public void onLoggedIn() {
-		Log.d(LOG_TAG, "User logged in");
-	}
-
-	@Override
-	public void onLoggedOut() {
-		Log.d(LOG_TAG, "User logged out");
-	}
-
-	@Override
-	public void onTemporaryError() {
-		Log.d(LOG_TAG, "Temporary error occurred");
-	}
-
-	@Override
-	public void onNewCredentials(String s) {
-		Log.d(LOG_TAG, "User credentials blob received");
-	}
-
-	@Override
-	public void onConnectionMessage(String message) {
-		Log.d(LOG_TAG, "Received connection message: " + message);
 	}
 
 	@Override
@@ -238,7 +241,39 @@ public class MixFragment extends ListFragment implements
 					"track with name " + trackNames.get(currentlyPlayingIndex)
 							+ " and uri " + trackUri + " saved with new count "
 							+ trackHistory.getPlayCount());
+
+			queueTrack(currentlyPlayingIndex + 1);
 		}
+	}
+
+	@Override
+	public void onError(Throwable throwable) {
+		Log.e(LOG_TAG, "Could not initialize player: " + throwable.getMessage());
+	}
+
+	@Override
+	public void onLoggedIn() {
+		Log.d(LOG_TAG, "User logged in");
+	}
+
+	@Override
+	public void onLoggedOut() {
+		Log.d(LOG_TAG, "User logged out");
+	}
+
+	@Override
+	public void onTemporaryError() {
+		Log.d(LOG_TAG, "Temporary error occurred");
+	}
+
+	@Override
+	public void onNewCredentials(String s) {
+		Log.d(LOG_TAG, "User credentials blob received");
+	}
+
+	@Override
+	public void onConnectionMessage(String message) {
+		Log.d(LOG_TAG, "Received connection message: " + message);
 	}
 
 	@Override
