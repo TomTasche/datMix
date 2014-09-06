@@ -29,6 +29,8 @@ public class MixFragment extends ListFragment implements
 		PlayerNotificationCallback, ConnectionStateCallback,
 		Player.InitializationObserver, OnItemClickListener {
 
+	private static final String LOG_TAG = "datMix";
+
 	private static final String EXTRA_PLAYLIST_ID = "playlist_id";
 
 	private HandlerThread backgroundThread;
@@ -46,6 +48,8 @@ public class MixFragment extends ListFragment implements
 
 	private ArrayAdapter<String> adapter;
 
+	private int currentlyPlayingIndex;
+
 	public static MixFragment newInstance(String accessToken, String playlistId) {
 		MixFragment mixFragment = new MixFragment();
 
@@ -61,6 +65,8 @@ public class MixFragment extends ListFragment implements
 	public MixFragment() {
 		trackNames = new LinkedList<String>();
 		trackUris = new LinkedList<String>();
+
+		currentlyPlayingIndex = 0;
 	}
 
 	@Override
@@ -109,8 +115,6 @@ public class MixFragment extends ListFragment implements
 							@Override
 							public void run() {
 								adapter.notifyDataSetChanged();
-
-								startPlaying(0, true);
 							}
 						});
 					}
@@ -151,11 +155,15 @@ public class MixFragment extends ListFragment implements
 	@Override
 	public void onItemClick(AdapterView<?> parent, View view, int position,
 			long id) {
-		startPlaying(position, true);
+		startPlaying(position);
 	}
 
-	private void startPlaying(int position, boolean force) {
-		queueTrack(position, force);
+	private void startPlaying(int position) {
+		// hack because we don't have proper callbacks for the currently playing
+		// song right now
+		currentlyPlayingIndex = position - 1;
+
+		queueTrack(position, true);
 		for (int i = position + 1; i < trackUris.size(); i++) {
 			queueTrack(i, false);
 		}
@@ -174,40 +182,62 @@ public class MixFragment extends ListFragment implements
 
 	@Override
 	public void onError(Throwable throwable) {
-		Log.e("MainActivity",
+		Log.e(LOG_TAG,
 				"Could not initialize player: " + throwable.getMessage());
 	}
 
 	@Override
 	public void onLoggedIn() {
-		Log.d("MainActivity", "User logged in");
+		Log.d(LOG_TAG, "User logged in");
 	}
 
 	@Override
 	public void onLoggedOut() {
-		Log.d("MainActivity", "User logged out");
+		Log.d(LOG_TAG, "User logged out");
 	}
 
 	@Override
 	public void onTemporaryError() {
-		Log.d("MainActivity", "Temporary error occurred");
+		Log.d(LOG_TAG, "Temporary error occurred");
 	}
 
 	@Override
 	public void onNewCredentials(String s) {
-		Log.d("MainActivity", "User credentials blob received");
+		Log.d(LOG_TAG, "User credentials blob received");
 	}
 
 	@Override
 	public void onConnectionMessage(String message) {
-		Log.d("MainActivity", "Received connection message: " + message);
+		Log.d(LOG_TAG, "Received connection message: " + message);
 	}
 
 	@Override
 	public void onPlaybackEvent(EventType eventType) {
-		Log.d("MainActivity", "Playback event received: " + eventType.name());
+		Log.d(LOG_TAG, "Playback event received: " + eventType.name());
 
-		if (eventType == EventType.BECAME_INACTIVE) {
+		if (eventType == EventType.TRACK_CHANGED) {
+			currentlyPlayingIndex++;
+
+			String trackUri = trackUris.get(currentlyPlayingIndex);
+
+			List<TrackHistory> trackHistories = TrackHistory.find(
+					TrackHistory.class, "spotify_uri = ?", trackUri);
+
+			TrackHistory trackHistory;
+			if (trackHistories.isEmpty()) {
+				trackHistory = new TrackHistory(trackUri);
+			} else {
+				trackHistory = trackHistories.get(0);
+			}
+
+			trackHistory.increasePlayCount();
+
+			trackHistory.save();
+
+			Log.d(LOG_TAG,
+					"track with name " + trackNames.get(currentlyPlayingIndex)
+							+ " and uri " + trackUri + " saved with new count "
+							+ trackHistory.getPlayCount());
 		}
 	}
 

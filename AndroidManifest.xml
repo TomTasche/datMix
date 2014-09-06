@@ -49,9 +49,6 @@
                     android:scheme="reddio-app" />
             </intent-filter>
         </activity>
-
-        <meta-data>
-        </meta-data>
     </application>
 
 </manifest>
