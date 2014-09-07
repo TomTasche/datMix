@@ -193,7 +193,7 @@ public class MixFragment extends ListFragment implements
 
 			break;
 		case R.id.button_skip:
-			startPlaying(currentlyPlayingIndex + 1);
+			skipTrack();
 
 			break;
 		default:
@@ -201,12 +201,26 @@ public class MixFragment extends ListFragment implements
 		}
 	}
 
-	private void startPlaying(int position) {
+	private synchronized void startPlaying(int position) {
 		// hack because we don't have proper callbacks for the currently playing
 		// song right now
 		currentlyPlayingIndex = position - 1;
 
 		playTrack(position);
+	}
+
+	private synchronized void playTrack(int position) {
+		if (position >= trackUris.size()) {
+			Log.d(LOG_TAG, "cant play track at position " + position + " of "
+					+ trackUris.size());
+
+			return;
+		}
+
+		String trackUri = trackUris.get(position);
+		Log.d(LOG_TAG, "playing track with name " + trackNames.get(position));
+
+		player.play(trackUri);
 	}
 
 	private void queueTrack(int position) {
@@ -224,18 +238,12 @@ public class MixFragment extends ListFragment implements
 		player.queue(trackUri);
 	}
 
-	private void playTrack(int position) {
-		if (position >= trackUris.size()) {
-			Log.d(LOG_TAG, "cant play track at position " + position + " of "
-					+ trackUris.size());
+	private void skipTrack() {
+		int oldTrackIndex = currentlyPlayingIndex;
 
-			return;
-		}
+		startPlaying(currentlyPlayingIndex + 1);
 
-		String trackUri = trackUris.get(position);
-		Log.d(LOG_TAG, "playing track with name " + trackNames.get(position));
-
-		player.play(trackUri);
+		logTrackSkipped(oldTrackIndex);
 	}
 
 	@Override
@@ -245,35 +253,52 @@ public class MixFragment extends ListFragment implements
 	}
 
 	@Override
-	public void onPlaybackEvent(EventType eventType) {
+	public synchronized void onPlaybackEvent(EventType eventType) {
 		Log.d(LOG_TAG, "Playback event received: " + eventType.name());
 
 		if (eventType == EventType.TRACK_CHANGED) {
 			currentlyPlayingIndex++;
 
-			String trackUri = trackUris.get(currentlyPlayingIndex);
-
-			List<TrackHistory> trackHistories = TrackHistory.find(
-					TrackHistory.class, "spotify_uri = ?", trackUri);
-
-			TrackHistory trackHistory;
-			if (trackHistories.isEmpty()) {
-				trackHistory = new TrackHistory(trackUri);
-			} else {
-				trackHistory = trackHistories.get(0);
-			}
-
-			trackHistory.increasePlayCount();
-
-			trackHistory.save();
-
-			Log.d(LOG_TAG,
-					"track with name " + trackNames.get(currentlyPlayingIndex)
-							+ " and uri " + trackUri + " saved with new count "
-							+ trackHistory.getPlayCount());
+			logTrackPlayed(currentlyPlayingIndex);
 
 			queueTrack(currentlyPlayingIndex + 1);
 		}
+	}
+
+	private synchronized void logTrackPlayed(int position) {
+		TrackHistory trackHistory = getHistory(position);
+		trackHistory.increasePlayCount();
+		trackHistory.save();
+
+		Log.d(LOG_TAG, "track with name " + trackNames.get(position)
+				+ " and uri " + trackUris.get(position)
+				+ " saved with new playcount " + trackHistory.getPlayCount());
+	}
+
+	private synchronized void logTrackSkipped(int position) {
+		TrackHistory trackHistory = getHistory(position);
+		trackHistory.increaseSkipCount();
+		trackHistory.save();
+
+		Log.d(LOG_TAG, "track with name " + trackNames.get(position)
+				+ " and uri " + trackUris.get(position)
+				+ " saved with new skipcount " + trackHistory.getSkipCount());
+	}
+
+	private TrackHistory getHistory(int position) {
+		String trackUri = trackUris.get(position);
+
+		List<TrackHistory> trackHistories = TrackHistory.find(
+				TrackHistory.class, "spotify_uri = ?", trackUri);
+
+		TrackHistory trackHistory;
+		if (trackHistories.isEmpty()) {
+			trackHistory = new TrackHistory(trackUri);
+		} else {
+			trackHistory = trackHistories.get(0);
+		}
+
+		return trackHistory;
 	}
 
 	@Override
