@@ -9,11 +9,14 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ArrayAdapter;
+import android.widget.TextView;
 
 import com.spotify.sdk.android.Spotify;
 import com.spotify.sdk.android.playback.ConnectionStateCallback;
@@ -50,6 +53,10 @@ public class MixFragment extends ListFragment implements
 	private ArrayAdapter<String> adapter;
 
 	private int currentlyPlayingIndex;
+
+	private View rootView;
+
+	private TextView emptyTextView;
 
 	public static MixFragment newInstance(String accessToken, String playlistId) {
 		MixFragment mixFragment = new MixFragment();
@@ -115,15 +122,27 @@ public class MixFragment extends ListFragment implements
 
 							@Override
 							public void run() {
+								// TODO: might be called before UI is
+								// initialized
 								adapter.notifyDataSetChanged();
+
+								emptyTextView.setVisibility(View.GONE);
+								getListView().setVisibility(View.VISIBLE);
 							}
 						});
 					}
 				} catch (Exception e) {
-					Log.e("spoti", "something went wrong!", e);
+					Log.e(LOG_TAG, "something went wrong!", e);
 				}
 			}
 		});
+	}
+
+	@Override
+	public View onCreateView(LayoutInflater inflater, ViewGroup container,
+			Bundle savedInstanceState) {
+		rootView = inflater.inflate(R.layout.list_with_bar, container, false);
+		return rootView;
 	}
 
 	@Override
@@ -138,18 +157,15 @@ public class MixFragment extends ListFragment implements
 
 		setListAdapter(adapter);
 
-		setEmptyText("Loading...");
-
 		getListView().setOnItemClickListener(this);
+
+		emptyTextView = (TextView) rootView.findViewById(R.id.text_empty);
 
 		// TODO: only while playing
 		getListView().setKeepScreenOn(true);
 
-		View buttonBar = getActivity().getLayoutInflater().inflate(
-				R.layout.button_bar, null);
-		buttonBar.findViewById(R.id.button_pause).setOnClickListener(this);
-		buttonBar.findViewById(R.id.button_skip).setOnClickListener(this);
-		getListView().addFooterView(buttonBar);
+		rootView.findViewById(R.id.button_pause).setOnClickListener(this);
+		rootView.findViewById(R.id.button_skip).setOnClickListener(this);
 	}
 
 	@Override
@@ -194,6 +210,13 @@ public class MixFragment extends ListFragment implements
 	}
 
 	private void queueTrack(int position) {
+		if (position >= trackUris.size()) {
+			Log.d(LOG_TAG, "cant queue track at position " + position + " of "
+					+ trackUris.size());
+
+			return;
+		}
+
 		String trackUri = trackUris.get(position);
 		Log.d(LOG_TAG, "queuing track with name " + trackNames.get(position));
 
@@ -202,6 +225,13 @@ public class MixFragment extends ListFragment implements
 	}
 
 	private void playTrack(int position) {
+		if (position >= trackUris.size()) {
+			Log.d(LOG_TAG, "cant play track at position " + position + " of "
+					+ trackUris.size());
+
+			return;
+		}
+
 		String trackUri = trackUris.get(position);
 		Log.d(LOG_TAG, "playing track with name " + trackNames.get(position));
 
