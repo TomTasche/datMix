@@ -50,12 +50,14 @@ public class MixFragment extends ListFragment implements
 	private List<String> trackNames;
 	private List<String> trackUris;
 
-	private ArrayAdapter<String> adapter;
-
 	private int currentlyPlayingIndex;
 
-	private View rootView;
+	private boolean isUiReady;
+	private Object lock;
 
+	private ArrayAdapter<String> adapter;
+
+	private View rootView;
 	private TextView emptyTextView;
 
 	public static MixFragment newInstance(String accessToken, String playlistId) {
@@ -73,6 +75,8 @@ public class MixFragment extends ListFragment implements
 	public MixFragment() {
 		trackNames = new LinkedList<String>();
 		trackUris = new LinkedList<String>();
+
+		lock = new Object();
 
 		currentlyPlayingIndex = 0;
 	}
@@ -117,22 +121,26 @@ public class MixFragment extends ListFragment implements
 					Collections.reverse(trackNames);
 					Collections.reverse(trackUris);
 
-					if (adapter != null) {
-						mainHandler.post(new Runnable() {
-
-							@Override
-							public void run() {
-								// TODO: might be called before UI is
-								// initialized
-								adapter.notifyDataSetChanged();
-
-								emptyTextView.setVisibility(View.GONE);
-								getListView().setVisibility(View.VISIBLE);
-							}
-						});
+					synchronized (lock) {
+						if (!isUiReady) {
+							lock.wait();
+						}
 					}
+
+					mainHandler.post(new Runnable() {
+
+						@Override
+						public void run() {
+							adapter.notifyDataSetChanged();
+
+							emptyTextView.setVisibility(View.GONE);
+							getListView().setVisibility(View.VISIBLE);
+						}
+					});
 				} catch (Exception e) {
-					Log.e(LOG_TAG, "something went wrong!", e);
+					Log.e(LOG_TAG,
+							"something went wrong fetching playlist with id "
+									+ playlistId, e);
 				}
 			}
 		});
@@ -166,6 +174,12 @@ public class MixFragment extends ListFragment implements
 
 		rootView.findViewById(R.id.button_pause).setOnClickListener(this);
 		rootView.findViewById(R.id.button_skip).setOnClickListener(this);
+
+		synchronized (lock) {
+			isUiReady = true;
+
+			lock.notify();
+		}
 	}
 
 	@Override
@@ -342,6 +356,7 @@ public class MixFragment extends ListFragment implements
 	public void onStop() {
 		Spotify.destroyPlayer(this);
 
+		backgroundThread.interrupt();
 		backgroundThread.quit();
 
 		super.onStop();
