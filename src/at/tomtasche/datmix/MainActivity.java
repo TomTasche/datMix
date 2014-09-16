@@ -6,18 +6,29 @@ import android.app.FragmentTransaction;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.View;
+import android.view.View.OnClickListener;
+import at.tomtasche.datmix.MixFragment.MixMode;
 import at.tomtasche.datmix.PlaylistsFragment.PlaylistListener;
 
-public class MainActivity extends Activity implements PlaylistListener {
+public class MainActivity extends Activity implements PlaylistListener,
+		OnClickListener {
 
 	private static final String FRAGMENT_TAG_PLAYLISTS = "playlists";
 	private static final String FRAGMENT_TAG_MIX = "mix";
 
 	private String accessToken;
 
+	private MixMode mode;
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+
+		setContentView(R.layout.main_activity);
+
+		findViewById(R.id.button_mode_radio).setOnClickListener(this);
+		findViewById(R.id.button_mode_awesome).setOnClickListener(this);
 
 		AuthenticationUtil.startAuthentication(this);
 	}
@@ -29,16 +40,28 @@ public class MainActivity extends Activity implements PlaylistListener {
 		Uri uri = intent.getData();
 		if (uri != null) {
 			accessToken = AuthenticationUtil.finishAuthentication(uri);
-
-			PlaylistsFragment playlistsFragment = PlaylistsFragment
-					.newInstance(accessToken);
-
-			FragmentTransaction transaction = getFragmentManager()
-					.beginTransaction();
-			transaction.add(android.R.id.content, playlistsFragment,
-					FRAGMENT_TAG_PLAYLISTS);
-			transaction.commit();
 		}
+	}
+
+	@Override
+	public void onClick(View v) {
+		if (v.getId() == R.id.button_mode_radio) {
+			mode = MixMode.RADIO;
+		} else if (v.getId() == R.id.button_mode_awesome) {
+			mode = MixMode.AWESOME;
+		}
+
+		// TODO: use a ModeFragment instead?
+		findViewById(R.id.layout_mode_buttons).setVisibility(View.GONE);
+
+		PlaylistsFragment playlistsFragment = PlaylistsFragment
+				.newInstance(accessToken);
+
+		FragmentTransaction transaction = getFragmentManager()
+				.beginTransaction();
+		transaction.add(android.R.id.content, playlistsFragment,
+				FRAGMENT_TAG_PLAYLISTS);
+		transaction.commit();
 	}
 
 	@Override
@@ -50,7 +73,7 @@ public class MainActivity extends Activity implements PlaylistListener {
 		}
 
 		MixFragment mixFragment = MixFragment.newInstance(accessToken,
-				playlistId);
+				playlistId, mode);
 
 		FragmentTransaction transaction = getFragmentManager()
 				.beginTransaction();

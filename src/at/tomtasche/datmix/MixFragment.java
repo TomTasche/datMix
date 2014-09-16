@@ -24,6 +24,7 @@ import com.spotify.sdk.android.playback.Player;
 import com.spotify.sdk.android.playback.PlayerNotificationCallback;
 import com.wrapper.spotify.Api;
 import com.wrapper.spotify.methods.CurrentUserRequest;
+import com.wrapper.spotify.methods.PlaylistRequest;
 import com.wrapper.spotify.methods.PlaylistTracksRequest;
 import com.wrapper.spotify.models.Page;
 import com.wrapper.spotify.models.PlaylistTrack;
@@ -36,6 +37,7 @@ public class MixFragment extends ListFragment implements
 	private static final String LOG_TAG = "datMix";
 
 	private static final String EXTRA_PLAYLIST_ID = "playlist_id";
+	private static final String EXTRA_MODE = "mode";
 
 	private HandlerThread backgroundThread;
 
@@ -46,6 +48,7 @@ public class MixFragment extends ListFragment implements
 	private Player player;
 
 	private String playlistId;
+	private MixMode mode;
 
 	private List<String> trackNames;
 	private List<String> trackUris;
@@ -60,12 +63,14 @@ public class MixFragment extends ListFragment implements
 	private View rootView;
 	private TextView emptyTextView;
 
-	public static MixFragment newInstance(String accessToken, String playlistId) {
+	public static MixFragment newInstance(String accessToken,
+			String playlistId, MixMode mode) {
 		MixFragment mixFragment = new MixFragment();
 
 		Bundle args = new Bundle();
 		args.putString(SpotifyBridge.EXTRA_ACCESS_TOKEN, accessToken);
 		args.putString(EXTRA_PLAYLIST_ID, playlistId);
+		args.putInt(EXTRA_MODE, mode.ordinal());
 
 		mixFragment.setArguments(args);
 
@@ -95,6 +100,9 @@ public class MixFragment extends ListFragment implements
 
 		playlistId = getArguments().getString(EXTRA_PLAYLIST_ID);
 
+		int modeOrdinal = getArguments().getInt(EXTRA_MODE);
+		mode = MixMode.values()[modeOrdinal];
+
 		player = spotifyBridge.getSpotify().getPlayer(getActivity(), "datMix",
 				this, this);
 
@@ -108,6 +116,9 @@ public class MixFragment extends ListFragment implements
 					CurrentUserRequest userRequest = api.getMe().build();
 					User user = userRequest.get();
 					String userId = user.getId();
+					
+					
+					
 
 					PlaylistTracksRequest tracksRequest = api
 							.getPlaylistTracks(userId, playlistId).build();
@@ -117,6 +128,8 @@ public class MixFragment extends ListFragment implements
 						trackNames.add(track.getTrack().getName());
 						trackUris.add(track.getTrack().getUri());
 					}
+					
+					
 
 					Collections.reverse(trackNames);
 					Collections.reverse(trackUris);
@@ -360,5 +373,9 @@ public class MixFragment extends ListFragment implements
 		backgroundThread.quit();
 
 		super.onStop();
+	}
+
+	public enum MixMode {
+		RADIO, AWESOME;
 	}
 }
