@@ -3,7 +3,10 @@ package at.tomtasche.datmix;
 import android.os.Bundle;
 
 import com.spotify.sdk.android.Spotify;
-import com.wrapper.spotify.Api;
+
+import at.tomtasche.datmix.spotify.SpotifyService;
+import retrofit.RequestInterceptor;
+import retrofit.RestAdapter;
 
 public class SpotifyBridge {
 
@@ -11,7 +14,7 @@ public class SpotifyBridge {
 
 	private String accessToken;
 
-	private Api api;
+	private SpotifyService api;
 
 	private Spotify spotify;
 
@@ -23,11 +26,14 @@ public class SpotifyBridge {
 		this.accessToken = accessToken;
 	}
 
-	public Api getApi() {
+	public SpotifyService getApi() {
 		if (api == null) {
-			api = Api.builder().clientId(AuthenticationUtil.CLIENT_ID)
-					.clientSecret("5387f3eee6ae4395bfdf503200c0ffdf")
-					.accessToken(accessToken).build();
+            RestAdapter restAdapter = new RestAdapter.Builder()
+                    .setEndpoint("https://api.spotify.com/v1")
+                    .setRequestInterceptor(new AccessTokenHeaderInterceptor())
+                    .build();
+
+            api = restAdapter.create(SpotifyService.class);
 		}
 
 		return api;
@@ -40,4 +46,12 @@ public class SpotifyBridge {
 
 		return spotify;
 	}
+
+    private class AccessTokenHeaderInterceptor implements RequestInterceptor {
+
+        @Override
+        public void intercept(RequestFacade request) {
+            request.addHeader("Authorization", "Bearer " + accessToken);
+        }
+    }
 }

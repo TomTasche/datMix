@@ -1,8 +1,5 @@
 package at.tomtasche.datmix;
 
-import java.util.LinkedList;
-import java.util.List;
-
 import android.app.Activity;
 import android.app.ListFragment;
 import android.os.Bundle;
@@ -14,12 +11,13 @@ import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ArrayAdapter;
 
-import com.wrapper.spotify.Api;
-import com.wrapper.spotify.methods.CurrentUserRequest;
-import com.wrapper.spotify.methods.UserPlaylistsRequest;
-import com.wrapper.spotify.models.Page;
-import com.wrapper.spotify.models.SimplePlaylist;
-import com.wrapper.spotify.models.User;
+import java.util.LinkedList;
+import java.util.List;
+
+import at.tomtasche.datmix.spotify.Me;
+import at.tomtasche.datmix.spotify.Paged;
+import at.tomtasche.datmix.spotify.Playlist;
+import at.tomtasche.datmix.spotify.SpotifyService;
 
 public class PlaylistsFragment extends ListFragment implements
 		OnItemClickListener {
@@ -71,16 +69,13 @@ public class PlaylistsFragment extends ListFragment implements
 			@Override
 			public void run() {
 				try {
-					Api api = spotifyBridge.getApi();
+					SpotifyService api = spotifyBridge.getApi();
 
-					CurrentUserRequest userRequest = api.getMe().build();
-					User user = userRequest.get();
-					String userId = user.getId();
+                    Me me = api.getMe();
+					String userId = me.getId();
 
-					UserPlaylistsRequest request = api.getPlaylistsForUser(
-							userId).build();
-					Page<SimplePlaylist> playlists = request.get();
-					for (SimplePlaylist playlist : playlists.getItems()) {
+                    Paged<Playlist[]> playlists = api.getPlaylists(userId);
+					for (Playlist playlist : playlists.getItems()) {
 						playlistNames.add(playlist.getName());
 						playlistIds.add(playlist.getId());
 					}

@@ -1,9 +1,5 @@
 package at.tomtasche.datmix;
 
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-
 import android.app.ListFragment;
 import android.os.Bundle;
 import android.os.Handler;
@@ -22,13 +18,16 @@ import com.spotify.sdk.android.Spotify;
 import com.spotify.sdk.android.playback.ConnectionStateCallback;
 import com.spotify.sdk.android.playback.Player;
 import com.spotify.sdk.android.playback.PlayerNotificationCallback;
-import com.wrapper.spotify.Api;
-import com.wrapper.spotify.methods.CurrentUserRequest;
-import com.wrapper.spotify.methods.PlaylistRequest;
-import com.wrapper.spotify.methods.PlaylistTracksRequest;
-import com.wrapper.spotify.models.Page;
-import com.wrapper.spotify.models.PlaylistTrack;
-import com.wrapper.spotify.models.User;
+
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+
+import at.tomtasche.datmix.spotify.Me;
+import at.tomtasche.datmix.spotify.Paged;
+import at.tomtasche.datmix.spotify.PlaylistTrack;
+import at.tomtasche.datmix.spotify.SpotifyService;
+import at.tomtasche.datmix.spotify.Track;
 
 public class MixFragment extends ListFragment implements
 		PlayerNotificationCallback, ConnectionStateCallback,
@@ -111,25 +110,16 @@ public class MixFragment extends ListFragment implements
 			@Override
 			public void run() {
 				try {
-					Api api = spotifyBridge.getApi();
+					SpotifyService api = spotifyBridge.getApi();
 
-					CurrentUserRequest userRequest = api.getMe().build();
-					User user = userRequest.get();
-					String userId = user.getId();
-					
-					
-					
+                    Me me = api.getMe();
+                    String userId = me.getId();
 
-					PlaylistTracksRequest tracksRequest = api
-							.getPlaylistTracks(userId, playlistId).build();
-					Page<PlaylistTrack> tracks = tracksRequest.get();
-
-					for (PlaylistTrack track : tracks.getItems()) {
+                    Paged<PlaylistTrack[]> tracks = api.getTracks(userId, playlistId);
+                    for (PlaylistTrack track : tracks.getItems()) {
 						trackNames.add(track.getTrack().getName());
 						trackUris.add(track.getTrack().getUri());
 					}
-					
-					
 
 					Collections.reverse(trackNames);
 					Collections.reverse(trackUris);

@@ -7,8 +7,8 @@
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
         <option name="modules">
           <set>
-            <option value="$USER_HOME$/Documents/workspace/datMix1" />
-            <option value="$USER_HOME$/Documents/workspace/datMix1/app" />
+            <option value="$USER_HOME$/Documents/workspace/datMix" />
+            <option value="$USER_HOME$/Documents/workspace/datMix/app" />
           </set>
         </option>
       </GradleProjectSettings>
