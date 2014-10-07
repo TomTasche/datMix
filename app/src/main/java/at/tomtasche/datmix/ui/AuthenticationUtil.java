@@ -14,7 +14,7 @@ public class AuthenticationUtil {
 	public static void startAuthentication(Activity callbackActivity) {
 		SpotifyAuthentication.openAuthWindow(CLIENT_ID, "token", REDIRECT_URI,
 				new String[] { "user-read-private", "streaming",
-						"playlist-read-private" }, null, callbackActivity);
+						"playlist-read-private", "playlist-modify-public", "playlist-modify-private" }, null, callbackActivity);
 	}
 
 	public static String finishAuthentication(Uri uri) {

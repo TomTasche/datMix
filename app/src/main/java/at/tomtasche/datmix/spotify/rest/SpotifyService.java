@@ -1,6 +1,11 @@
 package at.tomtasche.datmix.spotify.rest;
 
+import retrofit.client.Response;
+import retrofit.http.Body;
+import retrofit.http.DELETE;
 import retrofit.http.GET;
+import retrofit.http.Headers;
+import retrofit.http.POST;
 import retrofit.http.Path;
 
 public interface SpotifyService {
@@ -16,4 +21,12 @@ public interface SpotifyService {
 
     @GET("/users/{user_id}/playlists/{playlist_id}/tracks")
     Paged<PlaylistTrack[]> getTracks(@Path("user_id") String userId, @Path("playlist_id") String playlistId);
+
+    @Headers("Content-Type: application/json")
+    @BODYDELETE("/users/{user_id}/playlists/{playlist_id}/tracks")
+    Response removeTrack(@Path("user_id") String userId, @Path("playlist_id") String playlistId, @Body PositionedTracksContainer removeTracks);
+
+    @Headers("Content-Type: application/json")
+    @POST("/users/{user_id}/playlists/{playlist_id}/tracks")
+    Response addTrack(@Path("user_id") String userId, @Path("playlist_id") String playlistId, @Body PositionedTracksContainer addTracks);
 }

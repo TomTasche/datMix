@@ -25,11 +25,14 @@ import java.util.List;
 
 import at.tomtasche.datmix.R;
 import at.tomtasche.datmix.spotify.SpotifyBridge;
+import at.tomtasche.datmix.spotify.rest.PositionedTrack;
+import at.tomtasche.datmix.spotify.rest.PositionedTracksContainer;
 import at.tomtasche.datmix.storage.TrackHistory;
 import at.tomtasche.datmix.spotify.rest.Me;
 import at.tomtasche.datmix.spotify.rest.Paged;
 import at.tomtasche.datmix.spotify.rest.PlaylistTrack;
 import at.tomtasche.datmix.spotify.rest.SpotifyService;
+import retrofit.client.Response;
 
 public class MixFragment extends ListFragment implements
 		PlayerNotificationCallback, ConnectionStateCallback,
@@ -258,11 +261,52 @@ public class MixFragment extends ListFragment implements
 	}
 
 	private void skipTrack() {
-		int oldTrackIndex = currentlyPlayingIndex;
+		final int oldTrackIndex = currentlyPlayingIndex;
 
 		startPlaying(currentlyPlayingIndex + 1);
 
-		logTrackSkipped(oldTrackIndex);
+        // TODO: do this in batches (i.e. after the user skipped several tracks already)
+        backgroundHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                logTrackSkipped(oldTrackIndex);
+
+                try {
+                    SpotifyService api = spotifyBridge.getApi();
+
+                    Me me = api.getMe();
+                    String userId = me.getId();
+                    String trackUri = trackUris.get(oldTrackIndex);
+                    Integer[] positions = new Integer[] {trackUris.size() - 1 - oldTrackIndex};
+
+                    PositionedTrack removeTrack = new PositionedTrack(trackUri, positions);
+                    PositionedTracksContainer removeTracksContainer = new PositionedTracksContainer(removeTrack);
+                    Response removeResponse = api.removeTrack(userId, playlistId, removeTracksContainer);
+                    if (removeResponse.getStatus() != 200) {
+                        Log.e(LOG_TAG,
+                                "something went wrong removing track with uri " + trackUri + " from playlist with id "
+                                        + playlistId);
+                    }
+
+                    // not nice, but very simple
+                    // add track again at its old index+1
+                    positions[0]++;
+
+                    PositionedTrack addTrack = new PositionedTrack(trackUri, positions);
+                    PositionedTracksContainer addTracksContainer = new PositionedTracksContainer(addTrack);
+                    Response addResponse = api.removeTrack(userId, playlistId, addTracksContainer);
+                    if (addResponse.getStatus() != 200) {
+                        Log.e(LOG_TAG,
+                                "something went wrong adding track with uri " + trackUri + " to playlist with id "
+                                        + playlistId);
+                    }
+                } catch (Exception e) {
+                    Log.e(LOG_TAG,
+                            "something went wrong modifying playlist with id "
+                                    + playlistId, e);
+                }
+            }
+        });
 	}
 
 	@Override

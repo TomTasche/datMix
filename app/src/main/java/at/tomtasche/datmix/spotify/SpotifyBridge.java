@@ -4,6 +4,8 @@ import android.os.Bundle;
 
 import com.spotify.sdk.android.Spotify;
 
+import java.util.logging.Level;
+
 import at.tomtasche.datmix.spotify.rest.SpotifyService;
 import retrofit.RequestInterceptor;
 import retrofit.RestAdapter;
@@ -31,6 +33,7 @@ public class SpotifyBridge {
             RestAdapter restAdapter = new RestAdapter.Builder()
                     .setEndpoint("https://api.spotify.com/v1")
                     .setRequestInterceptor(new AccessTokenHeaderInterceptor())
+                    .setLogLevel(RestAdapter.LogLevel.FULL)
                     .build();
 
             api = restAdapter.create(SpotifyService.class);
