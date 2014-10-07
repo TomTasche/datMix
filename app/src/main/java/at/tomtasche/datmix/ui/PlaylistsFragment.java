@@ -1,4 +1,4 @@
-package at.tomtasche.datmix;
+package at.tomtasche.datmix.ui;
 
 import android.app.Activity;
 import android.app.ListFragment;
@@ -14,10 +14,11 @@ import android.widget.ArrayAdapter;
 import java.util.LinkedList;
 import java.util.List;
 
-import at.tomtasche.datmix.spotify.Me;
-import at.tomtasche.datmix.spotify.Paged;
-import at.tomtasche.datmix.spotify.Playlist;
-import at.tomtasche.datmix.spotify.SpotifyService;
+import at.tomtasche.datmix.spotify.SpotifyBridge;
+import at.tomtasche.datmix.spotify.rest.Me;
+import at.tomtasche.datmix.spotify.rest.Paged;
+import at.tomtasche.datmix.spotify.rest.Playlist;
+import at.tomtasche.datmix.spotify.rest.SpotifyService;
 
 public class PlaylistsFragment extends ListFragment implements
 		OnItemClickListener {

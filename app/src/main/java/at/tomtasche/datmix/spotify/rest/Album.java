@@ -1,11 +1,11 @@
-package at.tomtasche.datmix.spotify;
+package at.tomtasche.datmix.spotify.rest;
 
-public class Playlist {
+public class Album {
     private final String id;
     private final String name;
     private final String uri;
 
-    public Playlist(final String id, final String name, final String uri) {
+    public Album(final String id, final String name, final String uri) {
         this.id = id;
         this.name = name;
         this.uri = uri;

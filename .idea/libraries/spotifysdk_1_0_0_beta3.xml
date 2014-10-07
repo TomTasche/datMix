@@ -1,9 +1,9 @@
 <component name="libraryTable">
   <library name="spotifysdk-1.0.0-beta3">
     <CLASSES>
-      <root url="jar://$USER_HOME$/Documents/workspace/datMix/app/build/intermediates/exploded-aar/com.spotify.sdk/spotifysdk/1.0.0-beta3/classes.jar!/" />
-      <root url="file://$USER_HOME$/Documents/workspace/datMix/app/build/intermediates/exploded-aar/com.spotify.sdk/spotifysdk/1.0.0-beta3/res" />
-      <root url="jar://$USER_HOME$/Documents/workspace/datMix/app/build/intermediates/exploded-aar/com.spotify.sdk/spotifysdk/1.0.0-beta3/libs/jnihelpers-1.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/app/build/intermediates/exploded-aar/com.spotify.sdk/spotifysdk/1.0.0-beta3/classes.jar!/" />
+      <root url="jar://$PROJECT_DIR$/app/build/intermediates/exploded-aar/com.spotify.sdk/spotifysdk/1.0.0-beta3/libs/jnihelpers-1.0.jar!/" />
+      <root url="file://$PROJECT_DIR$/app/build/intermediates/exploded-aar/com.spotify.sdk/spotifysdk/1.0.0-beta3/res" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />

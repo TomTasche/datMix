@@ -1,4 +1,4 @@
-package at.tomtasche.datmix.spotify;
+package at.tomtasche.datmix.spotify.rest;
 
 public class PlaylistTrack {
     private final Track track;

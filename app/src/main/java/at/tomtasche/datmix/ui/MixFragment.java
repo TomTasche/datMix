@@ -1,4 +1,4 @@
-package at.tomtasche.datmix;
+package at.tomtasche.datmix.ui;
 
 import android.app.ListFragment;
 import android.os.Bundle;
@@ -23,11 +23,13 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
-import at.tomtasche.datmix.spotify.Me;
-import at.tomtasche.datmix.spotify.Paged;
-import at.tomtasche.datmix.spotify.PlaylistTrack;
-import at.tomtasche.datmix.spotify.SpotifyService;
-import at.tomtasche.datmix.spotify.Track;
+import at.tomtasche.datmix.R;
+import at.tomtasche.datmix.spotify.SpotifyBridge;
+import at.tomtasche.datmix.storage.TrackHistory;
+import at.tomtasche.datmix.spotify.rest.Me;
+import at.tomtasche.datmix.spotify.rest.Paged;
+import at.tomtasche.datmix.spotify.rest.PlaylistTrack;
+import at.tomtasche.datmix.spotify.rest.SpotifyService;
 
 public class MixFragment extends ListFragment implements
 		PlayerNotificationCallback, ConnectionStateCallback,

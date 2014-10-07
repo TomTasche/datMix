@@ -1,4 +1,4 @@
-package at.tomtasche.datmix;
+package at.tomtasche.datmix.storage;
 
 import com.orm.SugarRecord;
 

@@ -1,4 +1,4 @@
-package at.tomtasche.datmix;
+package at.tomtasche.datmix.ui;
 
 import android.app.Activity;
 import android.app.Fragment;
@@ -9,10 +9,9 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.View.OnClickListener;
 
-import at.tomtasche.datmix.MixFragment.MixMode;
-import at.tomtasche.datmix.PlaylistsFragment.PlaylistListener;
+import at.tomtasche.datmix.R;
 
-public class MainActivity extends Activity implements PlaylistListener,
+public class MainActivity extends Activity implements PlaylistsFragment.PlaylistListener,
 		OnClickListener {
 
 	private static final String FRAGMENT_TAG_PLAYLISTS = "playlists";
@@ -20,7 +19,7 @@ public class MainActivity extends Activity implements PlaylistListener,
 
 	private String accessToken;
 
-	private MixMode mode;
+	private MixFragment.MixMode mode;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -47,9 +46,9 @@ public class MainActivity extends Activity implements PlaylistListener,
 	@Override
 	public void onClick(View v) {
 		if (v.getId() == R.id.button_mode_radio) {
-			mode = MixMode.RADIO;
+			mode = MixFragment.MixMode.RADIO;
 		} else if (v.getId() == R.id.button_mode_awesome) {
-			mode = MixMode.AWESOME;
+			mode = MixFragment.MixMode.AWESOME;
 		}
 
 		// TODO: use a ModeFragment instead?

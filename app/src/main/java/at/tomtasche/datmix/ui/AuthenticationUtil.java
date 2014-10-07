@@ -1,4 +1,4 @@
-package at.tomtasche.datmix;
+package at.tomtasche.datmix.ui;
 
 import android.app.Activity;
 import android.net.Uri;

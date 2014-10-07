@@ -1,10 +1,10 @@
-package at.tomtasche.datmix;
+package at.tomtasche.datmix.spotify;
 
 import android.os.Bundle;
 
 import com.spotify.sdk.android.Spotify;
 
-import at.tomtasche.datmix.spotify.SpotifyService;
+import at.tomtasche.datmix.spotify.rest.SpotifyService;
 import retrofit.RequestInterceptor;
 import retrofit.RestAdapter;
 

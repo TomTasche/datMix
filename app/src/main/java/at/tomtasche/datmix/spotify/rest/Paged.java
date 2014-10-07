@@ -1,4 +1,4 @@
-package at.tomtasche.datmix.spotify;
+package at.tomtasche.datmix.spotify.rest;
 
 /**
  * taken from https://github.com/cpilsworth/retrofit-spotify

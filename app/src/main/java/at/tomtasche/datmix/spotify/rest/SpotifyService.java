@@ -1,4 +1,4 @@
-package at.tomtasche.datmix.spotify;
+package at.tomtasche.datmix.spotify.rest;
 
 import retrofit.http.GET;
 import retrofit.http.Path;
