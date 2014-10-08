@@ -4,32 +4,30 @@ import android.os.Bundle;
 
 import com.spotify.sdk.android.Spotify;
 
-import java.util.logging.Level;
-
 import at.tomtasche.datmix.spotify.rest.SpotifyService;
 import retrofit.RequestInterceptor;
 import retrofit.RestAdapter;
 
 public class SpotifyBridge {
 
-	public static final String EXTRA_ACCESS_TOKEN = "access_token";
+    public static final String EXTRA_ACCESS_TOKEN = "access_token";
 
-	private String accessToken;
+    private String accessToken;
 
-	private SpotifyService api;
+    private SpotifyService api;
 
-	private Spotify spotify;
+    private Spotify spotify;
 
-	public SpotifyBridge(Bundle bundle) {
-		this(bundle.getString(EXTRA_ACCESS_TOKEN));
-	}
+    public SpotifyBridge(Bundle bundle) {
+        this(bundle.getString(EXTRA_ACCESS_TOKEN));
+    }
 
-	public SpotifyBridge(String accessToken) {
-		this.accessToken = accessToken;
-	}
+    public SpotifyBridge(String accessToken) {
+        this.accessToken = accessToken;
+    }
 
-	public SpotifyService getApi() {
-		if (api == null) {
+    public SpotifyService getApi() {
+        if (api == null) {
             RestAdapter restAdapter = new RestAdapter.Builder()
                     .setEndpoint("https://api.spotify.com/v1")
                     .setRequestInterceptor(new AccessTokenHeaderInterceptor())
@@ -37,18 +35,18 @@ public class SpotifyBridge {
                     .build();
 
             api = restAdapter.create(SpotifyService.class);
-		}
+        }
 
-		return api;
-	}
+        return api;
+    }
 
-	public Spotify getSpotify() {
-		if (spotify == null) {
-			spotify = new Spotify(accessToken);
-		}
+    public Spotify getSpotify() {
+        if (spotify == null) {
+            spotify = new Spotify(accessToken);
+        }
 
-		return spotify;
-	}
+        return spotify;
+    }
 
     private class AccessTokenHeaderInterceptor implements RequestInterceptor {
 

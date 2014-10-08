@@ -21,127 +21,127 @@ import at.tomtasche.datmix.spotify.rest.Playlist;
 import at.tomtasche.datmix.spotify.rest.SpotifyService;
 
 public class PlaylistsFragment extends ListFragment implements
-		OnItemClickListener {
+        OnItemClickListener {
 
-	private HandlerThread backgroundThread;
+    private HandlerThread backgroundThread;
 
-	private Handler backgroundHandler;
-	private Handler mainHandler;
+    private Handler backgroundHandler;
+    private Handler mainHandler;
 
-	private SpotifyBridge spotifyBridge;
+    private SpotifyBridge spotifyBridge;
 
-	private PlaylistListener listener;
+    private PlaylistListener listener;
 
-	private List<String> playlistNames;
-	private List<String> playlistIds;
+    private List<String> playlistNames;
+    private List<String> playlistIds;
 
-	private ArrayAdapter<String> adapter;
+    private ArrayAdapter<String> adapter;
 
-	public static PlaylistsFragment newInstance(String accessToken) {
-		PlaylistsFragment mixFragment = new PlaylistsFragment();
+    public static PlaylistsFragment newInstance(String accessToken) {
+        PlaylistsFragment mixFragment = new PlaylistsFragment();
 
-		Bundle args = new Bundle();
-		args.putString(SpotifyBridge.EXTRA_ACCESS_TOKEN, accessToken);
+        Bundle args = new Bundle();
+        args.putString(SpotifyBridge.EXTRA_ACCESS_TOKEN, accessToken);
 
-		mixFragment.setArguments(args);
+        mixFragment.setArguments(args);
 
-		return mixFragment;
-	}
+        return mixFragment;
+    }
 
-	public PlaylistsFragment() {
-		playlistNames = new LinkedList<String>();
-		playlistIds = new LinkedList<String>();
-	}
+    public PlaylistsFragment() {
+        playlistNames = new LinkedList<String>();
+        playlistIds = new LinkedList<String>();
+    }
 
-	@Override
-	public void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
 
-		backgroundThread = new HandlerThread("spotify-thread");
-		backgroundThread.start();
+        backgroundThread = new HandlerThread("spotify-thread");
+        backgroundThread.start();
 
-		backgroundHandler = new Handler(backgroundThread.getLooper());
-		mainHandler = new Handler();
+        backgroundHandler = new Handler(backgroundThread.getLooper());
+        mainHandler = new Handler();
 
-		spotifyBridge = new SpotifyBridge(getArguments());
+        spotifyBridge = new SpotifyBridge(getArguments());
 
-		backgroundHandler.post(new Runnable() {
+        backgroundHandler.post(new Runnable() {
 
-			@Override
-			public void run() {
-				try {
-					SpotifyService api = spotifyBridge.getApi();
+            @Override
+            public void run() {
+                try {
+                    SpotifyService api = spotifyBridge.getApi();
 
                     Me me = api.getMe();
-					String userId = me.getId();
+                    String userId = me.getId();
 
                     Paged<Playlist[]> playlists = api.getPlaylists(userId);
-					for (Playlist playlist : playlists.getItems()) {
-						playlistNames.add(playlist.getName());
-						playlistIds.add(playlist.getId());
-					}
+                    for (Playlist playlist : playlists.getItems()) {
+                        playlistNames.add(playlist.getName());
+                        playlistIds.add(playlist.getId());
+                    }
 
-					if (adapter != null) {
-						mainHandler.post(new Runnable() {
+                    if (adapter != null) {
+                        mainHandler.post(new Runnable() {
 
-							@Override
-							public void run() {
-								adapter.notifyDataSetChanged();
-							}
-						});
-					}
-				} catch (Exception e) {
-					Log.e("spoti", "something went wrong!", e);
-				}
-			}
-		});
-	}
+                            @Override
+                            public void run() {
+                                adapter.notifyDataSetChanged();
+                            }
+                        });
+                    }
+                } catch (Exception e) {
+                    Log.e("spoti", "something went wrong!", e);
+                }
+            }
+        });
+    }
 
-	@Override
-	public void onActivityCreated(Bundle savedInstanceState) {
-		super.onActivityCreated(savedInstanceState);
+    @Override
+    public void onActivityCreated(Bundle savedInstanceState) {
+        super.onActivityCreated(savedInstanceState);
 
-		getActivity().setTitle("Choose a playlist");
+        getActivity().setTitle("Choose a playlist");
 
-		adapter = new ArrayAdapter<String>(getActivity(),
-				android.R.layout.simple_list_item_1, android.R.id.text1,
-				playlistNames);
+        adapter = new ArrayAdapter<String>(getActivity(),
+                android.R.layout.simple_list_item_1, android.R.id.text1,
+                playlistNames);
 
-		setListAdapter(adapter);
+        setListAdapter(adapter);
 
-		setEmptyText("Loading...");
+        setEmptyText("Loading...");
 
-		getListView().setOnItemClickListener(this);
-	}
+        getListView().setOnItemClickListener(this);
+    }
 
-	@Override
-	public void onAttach(Activity activity) {
-		super.onAttach(activity);
+    @Override
+    public void onAttach(Activity activity) {
+        super.onAttach(activity);
 
-		if (activity instanceof PlaylistListener) {
-			listener = (PlaylistListener) activity;
-		} else {
-			throw new IllegalArgumentException(
-					"activity must implement PlaylistListener");
-		}
-	}
+        if (activity instanceof PlaylistListener) {
+            listener = (PlaylistListener) activity;
+        } else {
+            throw new IllegalArgumentException(
+                    "activity must implement PlaylistListener");
+        }
+    }
 
-	@Override
-	public void onItemClick(AdapterView<?> parent, View view, int position,
-			long id) {
-		String playlistId = playlistIds.get(position);
-		listener.onPlaylistSelected(playlistId);
-	}
+    @Override
+    public void onItemClick(AdapterView<?> parent, View view, int position,
+                            long id) {
+        String playlistId = playlistIds.get(position);
+        listener.onPlaylistSelected(playlistId);
+    }
 
-	@Override
-	public void onStop() {
-		super.onStop();
+    @Override
+    public void onStop() {
+        super.onStop();
 
-		backgroundThread.quit();
-	}
+        backgroundThread.quit();
+    }
 
-	public interface PlaylistListener {
+    public interface PlaylistListener {
 
-		public void onPlaylistSelected(String playlistId);
-	}
+        public void onPlaylistSelected(String playlistId);
+    }
 }

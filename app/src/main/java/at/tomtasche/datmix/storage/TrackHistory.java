@@ -4,37 +4,37 @@ import com.orm.SugarRecord;
 
 public class TrackHistory extends SugarRecord<TrackHistory> {
 
-	private String spotifyUri;
-	private int playCount;
-	private int skipCount;
+    private String spotifyUri;
+    private int playCount;
+    private int skipCount;
 
-	public TrackHistory() {
-	}
+    public TrackHistory() {
+    }
 
-	public TrackHistory(String spotifyUri) {
-		this.spotifyUri = spotifyUri;
+    public TrackHistory(String spotifyUri) {
+        this.spotifyUri = spotifyUri;
 
-		playCount = 0;
-		skipCount = 0;
-	}
+        playCount = 0;
+        skipCount = 0;
+    }
 
-	public synchronized void increasePlayCount() {
-		playCount++;
-	}
+    public synchronized void increasePlayCount() {
+        playCount++;
+    }
 
-	public synchronized void increaseSkipCount() {
-		skipCount++;
-	}
+    public synchronized void increaseSkipCount() {
+        skipCount++;
+    }
 
-	public String getSpotifyUri() {
-		return spotifyUri;
-	}
+    public String getSpotifyUri() {
+        return spotifyUri;
+    }
 
-	public int getPlayCount() {
-		return playCount;
-	}
+    public int getPlayCount() {
+        return playCount;
+    }
 
-	public int getSkipCount() {
-		return skipCount;
-	}
+    public int getSkipCount() {
+        return skipCount;
+    }
 }

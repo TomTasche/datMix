@@ -19,251 +19,248 @@ import com.spotify.sdk.android.playback.ConnectionStateCallback;
 import com.spotify.sdk.android.playback.Player;
 import com.spotify.sdk.android.playback.PlayerNotificationCallback;
 
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
 import at.tomtasche.datmix.R;
 import at.tomtasche.datmix.spotify.SpotifyBridge;
-import at.tomtasche.datmix.spotify.rest.PositionedTrack;
-import at.tomtasche.datmix.spotify.rest.PositionedTracksContainer;
-import at.tomtasche.datmix.storage.TrackHistory;
 import at.tomtasche.datmix.spotify.rest.Me;
 import at.tomtasche.datmix.spotify.rest.Paged;
 import at.tomtasche.datmix.spotify.rest.PlaylistTrack;
+import at.tomtasche.datmix.spotify.rest.PositionedTrack;
+import at.tomtasche.datmix.spotify.rest.PositionedTracksContainer;
 import at.tomtasche.datmix.spotify.rest.SpotifyService;
+import at.tomtasche.datmix.storage.TrackHistory;
 import retrofit.client.Response;
 
 public class MixFragment extends ListFragment implements
-		PlayerNotificationCallback, ConnectionStateCallback,
-		Player.InitializationObserver, OnItemClickListener, OnClickListener {
+        PlayerNotificationCallback, ConnectionStateCallback,
+        Player.InitializationObserver, OnItemClickListener, OnClickListener {
 
-	private static final String LOG_TAG = "datMix";
+    private static final String LOG_TAG = "datMix";
 
-	private static final String EXTRA_PLAYLIST_ID = "playlist_id";
-	private static final String EXTRA_MODE = "mode";
+    private static final String EXTRA_PLAYLIST_ID = "playlist_id";
+    private static final String EXTRA_MODE = "mode";
 
-	private HandlerThread backgroundThread;
+    private HandlerThread backgroundThread;
 
-	private Handler backgroundHandler;
-	private Handler mainHandler;
+    private Handler backgroundHandler;
+    private Handler mainHandler;
 
-	private SpotifyBridge spotifyBridge;
-	private Player player;
+    private SpotifyBridge spotifyBridge;
+    private Player player;
 
-	private String playlistId;
-	private MixMode mode;
+    private String playlistId;
+    private MixMode mode;
 
-	private List<String> trackNames;
-	private List<String> trackUris;
+    private List<String> trackNames;
+    private List<String> trackUris;
 
-	private int currentlyPlayingIndex;
+    private int currentlyPlayingIndex;
 
-	private boolean isUiReady;
-	private Object lock;
+    private boolean isUiReady;
+    private Object lock;
 
-	private ArrayAdapter<String> adapter;
+    private ArrayAdapter<String> adapter;
 
-	private View rootView;
-	private TextView emptyTextView;
+    private View rootView;
+    private TextView emptyTextView;
 
-	public static MixFragment newInstance(String accessToken,
-			String playlistId, MixMode mode) {
-		MixFragment mixFragment = new MixFragment();
+    public static MixFragment newInstance(String accessToken,
+                                          String playlistId, MixMode mode) {
+        MixFragment mixFragment = new MixFragment();
 
-		Bundle args = new Bundle();
-		args.putString(SpotifyBridge.EXTRA_ACCESS_TOKEN, accessToken);
-		args.putString(EXTRA_PLAYLIST_ID, playlistId);
-		args.putInt(EXTRA_MODE, mode.ordinal());
+        Bundle args = new Bundle();
+        args.putString(SpotifyBridge.EXTRA_ACCESS_TOKEN, accessToken);
+        args.putString(EXTRA_PLAYLIST_ID, playlistId);
+        args.putInt(EXTRA_MODE, mode.ordinal());
 
-		mixFragment.setArguments(args);
+        mixFragment.setArguments(args);
 
-		return mixFragment;
-	}
+        return mixFragment;
+    }
 
-	public MixFragment() {
-		trackNames = new LinkedList<String>();
-		trackUris = new LinkedList<String>();
+    public MixFragment() {
+        trackNames = new LinkedList<String>();
+        trackUris = new LinkedList<String>();
 
-		lock = new Object();
+        lock = new Object();
 
-		currentlyPlayingIndex = 0;
-	}
+        currentlyPlayingIndex = 0;
+    }
 
-	@Override
-	public void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
 
-		backgroundThread = new HandlerThread("spotify-thread");
-		backgroundThread.start();
+        backgroundThread = new HandlerThread("spotify-thread");
+        backgroundThread.start();
 
-		backgroundHandler = new Handler(backgroundThread.getLooper());
-		mainHandler = new Handler();
+        backgroundHandler = new Handler(backgroundThread.getLooper());
+        mainHandler = new Handler();
 
-		spotifyBridge = new SpotifyBridge(getArguments());
+        spotifyBridge = new SpotifyBridge(getArguments());
 
-		playlistId = getArguments().getString(EXTRA_PLAYLIST_ID);
+        playlistId = getArguments().getString(EXTRA_PLAYLIST_ID);
 
-		int modeOrdinal = getArguments().getInt(EXTRA_MODE);
-		mode = MixMode.values()[modeOrdinal];
+        int modeOrdinal = getArguments().getInt(EXTRA_MODE);
+        mode = MixMode.values()[modeOrdinal];
 
-		player = spotifyBridge.getSpotify().getPlayer(getActivity(), "datMix",
-				this, this);
+        player = spotifyBridge.getSpotify().getPlayer(getActivity(), "datMix",
+                this, this);
 
-		backgroundHandler.post(new Runnable() {
+        backgroundHandler.post(new Runnable() {
 
-			@Override
-			public void run() {
-				try {
-					SpotifyService api = spotifyBridge.getApi();
+            @Override
+            public void run() {
+                try {
+                    SpotifyService api = spotifyBridge.getApi();
 
                     Me me = api.getMe();
                     String userId = me.getId();
 
                     Paged<PlaylistTrack[]> tracks = api.getTracks(userId, playlistId);
                     for (PlaylistTrack track : tracks.getItems()) {
-						trackNames.add(track.getTrack().getName());
-						trackUris.add(track.getTrack().getUri());
-					}
+                        trackNames.add(track.getTrack().getName());
+                        trackUris.add(track.getTrack().getUri());
+                    }
 
-					Collections.reverse(trackNames);
-					Collections.reverse(trackUris);
+                    synchronized (lock) {
+                        if (!isUiReady) {
+                            lock.wait();
+                        }
+                    }
 
-					synchronized (lock) {
-						if (!isUiReady) {
-							lock.wait();
-						}
-					}
+                    mainHandler.post(new Runnable() {
 
-					mainHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            adapter.notifyDataSetChanged();
 
-						@Override
-						public void run() {
-							adapter.notifyDataSetChanged();
+                            emptyTextView.setVisibility(View.GONE);
+                            getListView().setVisibility(View.VISIBLE);
+                        }
+                    });
+                } catch (Exception e) {
+                    Log.e(LOG_TAG,
+                            "something went wrong fetching playlist with id "
+                                    + playlistId, e);
+                }
+            }
+        });
+    }
 
-							emptyTextView.setVisibility(View.GONE);
-							getListView().setVisibility(View.VISIBLE);
-						}
-					});
-				} catch (Exception e) {
-					Log.e(LOG_TAG,
-							"something went wrong fetching playlist with id "
-									+ playlistId, e);
-				}
-			}
-		});
-	}
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        rootView = inflater.inflate(R.layout.list_with_bar, container, false);
+        return rootView;
+    }
 
-	@Override
-	public View onCreateView(LayoutInflater inflater, ViewGroup container,
-			Bundle savedInstanceState) {
-		rootView = inflater.inflate(R.layout.list_with_bar, container, false);
-		return rootView;
-	}
+    @Override
+    public void onActivityCreated(Bundle savedInstanceState) {
+        super.onActivityCreated(savedInstanceState);
 
-	@Override
-	public void onActivityCreated(Bundle savedInstanceState) {
-		super.onActivityCreated(savedInstanceState);
+        getActivity().setTitle("Choose a track");
 
-		getActivity().setTitle("Choose a track");
+        adapter = new ArrayAdapter<String>(getActivity(),
+                android.R.layout.simple_list_item_1, android.R.id.text1,
+                trackNames);
 
-		adapter = new ArrayAdapter<String>(getActivity(),
-				android.R.layout.simple_list_item_1, android.R.id.text1,
-				trackNames);
+        setListAdapter(adapter);
 
-		setListAdapter(adapter);
+        getListView().setOnItemClickListener(this);
 
-		getListView().setOnItemClickListener(this);
+        emptyTextView = (TextView) rootView.findViewById(R.id.text_empty);
 
-		emptyTextView = (TextView) rootView.findViewById(R.id.text_empty);
+        // TODO: only while playing
+        getListView().setKeepScreenOn(true);
 
-		// TODO: only while playing
-		getListView().setKeepScreenOn(true);
+        rootView.findViewById(R.id.button_pause).setOnClickListener(this);
+        rootView.findViewById(R.id.button_skip).setOnClickListener(this);
 
-		rootView.findViewById(R.id.button_pause).setOnClickListener(this);
-		rootView.findViewById(R.id.button_skip).setOnClickListener(this);
+        synchronized (lock) {
+            isUiReady = true;
 
-		synchronized (lock) {
-			isUiReady = true;
+            lock.notify();
+        }
+    }
 
-			lock.notify();
-		}
-	}
+    @Override
+    public void onResume() {
+        player.resume();
 
-	@Override
-	public void onResume() {
-		player.resume();
+        super.onResume();
+    }
 
-		super.onResume();
-	}
+    @Override
+    public void onItemClick(AdapterView<?> parent, View view, int position,
+                            long id) {
+        startPlaying(position);
+    }
 
-	@Override
-	public void onItemClick(AdapterView<?> parent, View view, int position,
-			long id) {
-		startPlaying(position);
-	}
+    @Override
+    public void onClick(View v) {
+        switch (v.getId()) {
+            case R.id.button_pause:
+                if (player.isPlaying()) {
+                    player.pause();
+                } else {
+                    player.resume();
+                }
 
-	@Override
-	public void onClick(View v) {
-		switch (v.getId()) {
-		case R.id.button_pause:
-			if (player.isPlaying()) {
-				player.pause();
-			} else {
-				player.resume();
-			}
+                break;
+            case R.id.button_skip:
+                skipTrack();
 
-			break;
-		case R.id.button_skip:
-			skipTrack();
+                break;
+            default:
+                break;
+        }
+    }
 
-			break;
-		default:
-			break;
-		}
-	}
+    private synchronized void startPlaying(int position) {
+        // hack because we don't have proper callbacks for the currently playing
+        // song right now
+        currentlyPlayingIndex = position - 1;
 
-	private synchronized void startPlaying(int position) {
-		// hack because we don't have proper callbacks for the currently playing
-		// song right now
-		currentlyPlayingIndex = position - 1;
+        playTrack(position);
+    }
 
-		playTrack(position);
-	}
+    private synchronized void playTrack(int position) {
+        if (position >= trackUris.size()) {
+            Log.d(LOG_TAG, "cant play track at position " + position + " of "
+                    + trackUris.size());
 
-	private synchronized void playTrack(int position) {
-		if (position >= trackUris.size()) {
-			Log.d(LOG_TAG, "cant play track at position " + position + " of "
-					+ trackUris.size());
+            return;
+        }
 
-			return;
-		}
+        String trackUri = trackUris.get(position);
+        Log.d(LOG_TAG, "playing track with name " + trackNames.get(position));
 
-		String trackUri = trackUris.get(position);
-		Log.d(LOG_TAG, "playing track with name " + trackNames.get(position));
+        player.play(trackUri);
+    }
 
-		player.play(trackUri);
-	}
+    private void queueTrack(int position) {
+        if (position >= trackUris.size()) {
+            Log.d(LOG_TAG, "cant queue track at position " + position + " of "
+                    + trackUris.size());
 
-	private void queueTrack(int position) {
-		if (position >= trackUris.size()) {
-			Log.d(LOG_TAG, "cant queue track at position " + position + " of "
-					+ trackUris.size());
+            return;
+        }
 
-			return;
-		}
+        String trackUri = trackUris.get(position);
+        Log.d(LOG_TAG, "queuing track with name " + trackNames.get(position));
 
-		String trackUri = trackUris.get(position);
-		Log.d(LOG_TAG, "queuing track with name " + trackNames.get(position));
+        player.clearQueue();
+        player.queue(trackUri);
+    }
 
-		player.clearQueue();
-		player.queue(trackUri);
-	}
+    private void skipTrack() {
+        final int oldTrackIndex = currentlyPlayingIndex;
 
-	private void skipTrack() {
-		final int oldTrackIndex = currentlyPlayingIndex;
-
-		startPlaying(currentlyPlayingIndex + 1);
+        startPlaying(currentlyPlayingIndex + 1);
 
         // TODO: do this in batches (i.e. after the user skipped several tracks already)
         backgroundHandler.post(new Runnable() {
@@ -277,7 +274,7 @@ public class MixFragment extends ListFragment implements
                     Me me = api.getMe();
                     String userId = me.getId();
                     String trackUri = trackUris.get(oldTrackIndex);
-                    Integer[] positions = new Integer[] {trackUris.size() - 1 - oldTrackIndex};
+                    Integer[] positions = new Integer[]{oldTrackIndex};
 
                     PositionedTrack removeTrack = new PositionedTrack(trackUri, positions);
                     PositionedTracksContainer removeTracksContainer = new PositionedTracksContainer(removeTrack);
@@ -294,8 +291,8 @@ public class MixFragment extends ListFragment implements
 
                     PositionedTrack addTrack = new PositionedTrack(trackUri, positions);
                     PositionedTracksContainer addTracksContainer = new PositionedTracksContainer(addTrack);
-                    Response addResponse = api.removeTrack(userId, playlistId, addTracksContainer);
-                    if (addResponse.getStatus() != 200) {
+                    Response addResponse = api.addTrack(userId, playlistId, Arrays.asList(trackUri), positions[0]);
+                    if (addResponse.getStatus() != 201) {
                         Log.e(LOG_TAG,
                                 "something went wrong adding track with uri " + trackUri + " to playlist with id "
                                         + playlistId);
@@ -307,111 +304,111 @@ public class MixFragment extends ListFragment implements
                 }
             }
         });
-	}
+    }
 
-	@Override
-	public void onInitialized() {
-		player.addConnectionStateCallback(this);
-		player.addPlayerNotificationCallback(this);
-	}
+    @Override
+    public void onInitialized() {
+        player.addConnectionStateCallback(this);
+        player.addPlayerNotificationCallback(this);
+    }
 
-	@Override
-	public synchronized void onPlaybackEvent(EventType eventType) {
-		Log.d(LOG_TAG, "Playback event received: " + eventType.name());
+    @Override
+    public synchronized void onPlaybackEvent(EventType eventType) {
+        Log.d(LOG_TAG, "Playback event received: " + eventType.name());
 
-		if (eventType == EventType.TRACK_CHANGED) {
-			currentlyPlayingIndex++;
+        if (eventType == EventType.TRACK_CHANGED) {
+            currentlyPlayingIndex++;
 
-			logTrackPlayed(currentlyPlayingIndex);
+            logTrackPlayed(currentlyPlayingIndex);
 
-			queueTrack(currentlyPlayingIndex + 1);
-		}
-	}
+            queueTrack(currentlyPlayingIndex + 1);
+        }
+    }
 
-	private synchronized void logTrackPlayed(int position) {
-		TrackHistory trackHistory = getHistory(position);
-		trackHistory.increasePlayCount();
-		trackHistory.save();
+    private synchronized void logTrackPlayed(int position) {
+        TrackHistory trackHistory = getHistory(position);
+        trackHistory.increasePlayCount();
+        trackHistory.save();
 
-		Log.d(LOG_TAG, "track with name " + trackNames.get(position)
-				+ " and uri " + trackUris.get(position)
-				+ " saved with new playcount " + trackHistory.getPlayCount());
-	}
+        Log.d(LOG_TAG, "track with name " + trackNames.get(position)
+                + " and uri " + trackUris.get(position)
+                + " saved with new playcount " + trackHistory.getPlayCount());
+    }
 
-	private synchronized void logTrackSkipped(int position) {
-		TrackHistory trackHistory = getHistory(position);
-		trackHistory.increaseSkipCount();
-		trackHistory.save();
+    private synchronized void logTrackSkipped(int position) {
+        TrackHistory trackHistory = getHistory(position);
+        trackHistory.increaseSkipCount();
+        trackHistory.save();
 
-		Log.d(LOG_TAG, "track with name " + trackNames.get(position)
-				+ " and uri " + trackUris.get(position)
-				+ " saved with new skipcount " + trackHistory.getSkipCount());
-	}
+        Log.d(LOG_TAG, "track with name " + trackNames.get(position)
+                + " and uri " + trackUris.get(position)
+                + " saved with new skipcount " + trackHistory.getSkipCount());
+    }
 
-	private TrackHistory getHistory(int position) {
-		String trackUri = trackUris.get(position);
+    private TrackHistory getHistory(int position) {
+        String trackUri = trackUris.get(position);
 
-		List<TrackHistory> trackHistories = TrackHistory.find(
-				TrackHistory.class, "spotify_uri = ?", trackUri);
+        List<TrackHistory> trackHistories = TrackHistory.find(
+                TrackHistory.class, "spotify_uri = ?", trackUri);
 
-		TrackHistory trackHistory;
-		if (trackHistories.isEmpty()) {
-			trackHistory = new TrackHistory(trackUri);
-		} else {
-			trackHistory = trackHistories.get(0);
-		}
+        TrackHistory trackHistory;
+        if (trackHistories.isEmpty()) {
+            trackHistory = new TrackHistory(trackUri);
+        } else {
+            trackHistory = trackHistories.get(0);
+        }
 
-		return trackHistory;
-	}
+        return trackHistory;
+    }
 
-	@Override
-	public void onError(Throwable throwable) {
-		Log.e(LOG_TAG, "Could not initialize player: " + throwable.getMessage());
-	}
+    @Override
+    public void onError(Throwable throwable) {
+        Log.e(LOG_TAG, "Could not initialize player: " + throwable.getMessage());
+    }
 
-	@Override
-	public void onLoggedIn() {
-		Log.d(LOG_TAG, "User logged in");
-	}
+    @Override
+    public void onLoggedIn() {
+        Log.d(LOG_TAG, "User logged in");
+    }
 
-	@Override
-	public void onLoggedOut() {
-		Log.d(LOG_TAG, "User logged out");
-	}
+    @Override
+    public void onLoggedOut() {
+        Log.d(LOG_TAG, "User logged out");
+    }
 
-	@Override
-	public void onTemporaryError() {
-		Log.d(LOG_TAG, "Temporary error occurred");
-	}
+    @Override
+    public void onTemporaryError() {
+        Log.d(LOG_TAG, "Temporary error occurred");
+    }
 
-	@Override
-	public void onNewCredentials(String s) {
-		Log.d(LOG_TAG, "User credentials blob received");
-	}
+    @Override
+    public void onNewCredentials(String s) {
+        Log.d(LOG_TAG, "User credentials blob received");
+    }
 
-	@Override
-	public void onConnectionMessage(String message) {
-		Log.d(LOG_TAG, "Received connection message: " + message);
-	}
+    @Override
+    public void onConnectionMessage(String message) {
+        Log.d(LOG_TAG, "Received connection message: " + message);
+    }
 
-	@Override
-	public void onPause() {
-		player.pause();
+    @Override
+    public void onPause() {
+        player.pause();
 
-		super.onPause();
-	}
+        super.onPause();
+    }
 
-	@Override
-	public void onStop() {
-		Spotify.destroyPlayer(this);
+    @Override
+    public void onStop() {
+        Spotify.destroyPlayer(this);
 
-		backgroundThread.interrupt();
-		backgroundThread.quit();
+        backgroundThread.interrupt();
+        backgroundThread.quit();
 
-		super.onStop();
-	}
+        super.onStop();
+    }
 
-	public enum MixMode {
-		RADIO, AWESOME;
-	}
+    public enum MixMode {
+        RADIO, AWESOME;
+    }
 }
