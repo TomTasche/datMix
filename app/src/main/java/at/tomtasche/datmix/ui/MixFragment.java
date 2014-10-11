@@ -1,9 +1,15 @@
 package at.tomtasche.datmix.ui;
 
+import android.app.Activity;
 import android.app.ListFragment;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.IBinder;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -14,65 +20,51 @@ import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.TextView;
 
-import com.spotify.sdk.android.Spotify;
-import com.spotify.sdk.android.playback.ConnectionStateCallback;
-import com.spotify.sdk.android.playback.Player;
-import com.spotify.sdk.android.playback.PlayerNotificationCallback;
-
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
 import at.tomtasche.datmix.R;
-import at.tomtasche.datmix.spotify.SpotifyBridge;
-import at.tomtasche.datmix.spotify.rest.Me;
-import at.tomtasche.datmix.spotify.rest.Paged;
+import at.tomtasche.datmix.service.SpotifyService;
 import at.tomtasche.datmix.spotify.rest.PlaylistTrack;
-import at.tomtasche.datmix.spotify.rest.PositionedTrack;
-import at.tomtasche.datmix.spotify.rest.PositionedTracksContainer;
-import at.tomtasche.datmix.spotify.rest.SpotifyService;
-import at.tomtasche.datmix.storage.TrackHistory;
-import retrofit.client.Response;
 
 public class MixFragment extends ListFragment implements
-        PlayerNotificationCallback, ConnectionStateCallback,
-        Player.InitializationObserver, OnItemClickListener, OnClickListener {
+        OnItemClickListener, OnClickListener, SpotifyService.SpotifyBridgeListener {
 
     private static final String LOG_TAG = "datMix";
 
     private static final String EXTRA_PLAYLIST_ID = "playlist_id";
     private static final String EXTRA_MODE = "mode";
+    private static final String EXTRA_ACCESS_TOKEN = "access_token";
 
     private HandlerThread backgroundThread;
 
     private Handler backgroundHandler;
     private Handler mainHandler;
 
-    private SpotifyBridge spotifyBridge;
-    private Player player;
-
     private String playlistId;
     private MixMode mode;
 
-    private List<String> trackNames;
-    private List<String> trackUris;
+    private List<PlaylistTrack> tracks;
 
     private int currentlyPlayingIndex;
 
     private boolean isUiReady;
     private Object lock;
 
-    private ArrayAdapter<String> adapter;
+    private ArrayAdapter<PlaylistTrack> adapter;
 
     private View rootView;
     private TextView emptyTextView;
+
+    private ServiceConnection serviceConnection;
+    private SpotifyService.SpotifyBridge spotifyBridge;
 
     public static MixFragment newInstance(String accessToken,
                                           String playlistId, MixMode mode) {
         MixFragment mixFragment = new MixFragment();
 
         Bundle args = new Bundle();
-        args.putString(SpotifyBridge.EXTRA_ACCESS_TOKEN, accessToken);
+        args.putString(EXTRA_ACCESS_TOKEN, accessToken);
         args.putString(EXTRA_PLAYLIST_ID, playlistId);
         args.putInt(EXTRA_MODE, mode.ordinal());
 
@@ -82,8 +74,7 @@ public class MixFragment extends ListFragment implements
     }
 
     public MixFragment() {
-        trackNames = new LinkedList<String>();
-        trackUris = new LinkedList<String>();
+        tracks = new LinkedList<PlaylistTrack>();
 
         lock = new Object();
 
@@ -100,31 +91,18 @@ public class MixFragment extends ListFragment implements
         backgroundHandler = new Handler(backgroundThread.getLooper());
         mainHandler = new Handler();
 
-        spotifyBridge = new SpotifyBridge(getArguments());
-
         playlistId = getArguments().getString(EXTRA_PLAYLIST_ID);
 
         int modeOrdinal = getArguments().getInt(EXTRA_MODE);
         mode = MixMode.values()[modeOrdinal];
-
-        player = spotifyBridge.getSpotify().getPlayer(getActivity(), "datMix",
-                this, this);
 
         backgroundHandler.post(new Runnable() {
 
             @Override
             public void run() {
                 try {
-                    SpotifyService api = spotifyBridge.getApi();
-
-                    Me me = api.getMe();
-                    String userId = me.getId();
-
-                    Paged<PlaylistTrack[]> tracks = api.getTracks(userId, playlistId);
-                    for (PlaylistTrack track : tracks.getItems()) {
-                        trackNames.add(track.getTrack().getName());
-                        trackUris.add(track.getTrack().getUri());
-                    }
+                    // TODO: getTracksForPlaylist
+                    tracks = spotifyBridge.getTracksForPlaylist(playlistId);
 
                     synchronized (lock) {
                         if (!isUiReady) {
@@ -164,18 +142,15 @@ public class MixFragment extends ListFragment implements
 
         getActivity().setTitle("Choose a track");
 
-        adapter = new ArrayAdapter<String>(getActivity(),
+        adapter = new ArrayAdapter<PlaylistTrack>(getActivity(),
                 android.R.layout.simple_list_item_1, android.R.id.text1,
-                trackNames);
+                tracks);
 
         setListAdapter(adapter);
 
         getListView().setOnItemClickListener(this);
 
         emptyTextView = (TextView) rootView.findViewById(R.id.text_empty);
-
-        // TODO: only while playing
-        getListView().setKeepScreenOn(true);
 
         rootView.findViewById(R.id.button_pause).setOnClickListener(this);
         rootView.findViewById(R.id.button_skip).setOnClickListener(this);
@@ -188,10 +163,11 @@ public class MixFragment extends ListFragment implements
     }
 
     @Override
-    public void onResume() {
-        player.resume();
+    public void onAttach(Activity activity) {
+        super.onAttach(activity);
 
-        super.onResume();
+        Intent intent = new Intent(getActivity(), SpotifyService.class);
+        getActivity().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
     }
 
     @Override
@@ -204,11 +180,7 @@ public class MixFragment extends ListFragment implements
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.button_pause:
-                if (player.isPlaying()) {
-                    player.pause();
-                } else {
-                    player.resume();
-                }
+                spotifyBridge.togglePlaying();
 
                 break;
             case R.id.button_skip:
@@ -229,32 +201,29 @@ public class MixFragment extends ListFragment implements
     }
 
     private synchronized void playTrack(int position) {
-        if (position >= trackUris.size()) {
+        if (position >= tracks.size()) {
             Log.d(LOG_TAG, "cant play track at position " + position + " of "
-                    + trackUris.size());
+                    + tracks.size());
 
             return;
         }
 
-        String trackUri = trackUris.get(position);
-        Log.d(LOG_TAG, "playing track with name " + trackNames.get(position));
-
-        player.play(trackUri);
+        PlaylistTrack track = getTrack(position);
+        Log.d(LOG_TAG, "playing track with name " + track.getTrack().getName());
+        spotifyBridge.playTrack(track);
     }
 
     private void queueTrack(int position) {
-        if (position >= trackUris.size()) {
+        if (position >= tracks.size()) {
             Log.d(LOG_TAG, "cant queue track at position " + position + " of "
-                    + trackUris.size());
+                    + tracks.size());
 
             return;
         }
 
-        String trackUri = trackUris.get(position);
-        Log.d(LOG_TAG, "queuing track with name " + trackNames.get(position));
-
-        player.clearQueue();
-        player.queue(trackUri);
+        PlaylistTrack track = getTrack(position);
+        Log.d(LOG_TAG, "queuing track with name " + track.getTrack().getName());
+        spotifyBridge.queueTrack(track);
     }
 
     private void skipTrack() {
@@ -266,37 +235,11 @@ public class MixFragment extends ListFragment implements
         backgroundHandler.post(new Runnable() {
             @Override
             public void run() {
-                logTrackSkipped(oldTrackIndex);
+                spotifyBridge.logTrackSkipped(getTrack(oldTrackIndex));
 
                 try {
-                    SpotifyService api = spotifyBridge.getApi();
-
-                    Me me = api.getMe();
-                    String userId = me.getId();
-                    String trackUri = trackUris.get(oldTrackIndex);
-                    Integer[] positions = new Integer[]{oldTrackIndex};
-
-                    PositionedTrack removeTrack = new PositionedTrack(trackUri, positions);
-                    PositionedTracksContainer removeTracksContainer = new PositionedTracksContainer(removeTrack);
-                    Response removeResponse = api.removeTrack(userId, playlistId, removeTracksContainer);
-                    if (removeResponse.getStatus() != 200) {
-                        Log.e(LOG_TAG,
-                                "something went wrong removing track with uri " + trackUri + " from playlist with id "
-                                        + playlistId);
-                    }
-
-                    // not nice, but very simple
-                    // add track again at its old index+1
-                    positions[0]++;
-
-                    PositionedTrack addTrack = new PositionedTrack(trackUri, positions);
-                    PositionedTracksContainer addTracksContainer = new PositionedTracksContainer(addTrack);
-                    Response addResponse = api.addTrack(userId, playlistId, Arrays.asList(trackUri), positions[0]);
-                    if (addResponse.getStatus() != 201) {
-                        Log.e(LOG_TAG,
-                                "something went wrong adding track with uri " + trackUri + " to playlist with id "
-                                        + playlistId);
-                    }
+                    PlaylistTrack track = getTrack(oldTrackIndex);
+                    spotifyBridge.rankDownTrack(playlistId, track.getTrack().getUri(), oldTrackIndex);
                 } catch (Exception e) {
                     Log.e(LOG_TAG,
                             "something went wrong modifying playlist with id "
@@ -306,102 +249,32 @@ public class MixFragment extends ListFragment implements
         });
     }
 
+    private PlaylistTrack getTrack(int position) {
+        return adapter.getItem(position);
+    }
+
     @Override
     public void onInitialized() {
-        player.addConnectionStateCallback(this);
-        player.addPlayerNotificationCallback(this);
     }
 
     @Override
-    public synchronized void onPlaybackEvent(EventType eventType) {
-        Log.d(LOG_TAG, "Playback event received: " + eventType.name());
+    public void onTrackChanged() {
+        currentlyPlayingIndex++;
 
-        if (eventType == EventType.TRACK_CHANGED) {
-            currentlyPlayingIndex++;
+        spotifyBridge.logTrackPlayed(getTrack(currentlyPlayingIndex));
 
-            logTrackPlayed(currentlyPlayingIndex);
-
-            queueTrack(currentlyPlayingIndex + 1);
-        }
-    }
-
-    private synchronized void logTrackPlayed(int position) {
-        TrackHistory trackHistory = getHistory(position);
-        trackHistory.increasePlayCount();
-        trackHistory.save();
-
-        Log.d(LOG_TAG, "track with name " + trackNames.get(position)
-                + " and uri " + trackUris.get(position)
-                + " saved with new playcount " + trackHistory.getPlayCount());
-    }
-
-    private synchronized void logTrackSkipped(int position) {
-        TrackHistory trackHistory = getHistory(position);
-        trackHistory.increaseSkipCount();
-        trackHistory.save();
-
-        Log.d(LOG_TAG, "track with name " + trackNames.get(position)
-                + " and uri " + trackUris.get(position)
-                + " saved with new skipcount " + trackHistory.getSkipCount());
-    }
-
-    private TrackHistory getHistory(int position) {
-        String trackUri = trackUris.get(position);
-
-        List<TrackHistory> trackHistories = TrackHistory.find(
-                TrackHistory.class, "spotify_uri = ?", trackUri);
-
-        TrackHistory trackHistory;
-        if (trackHistories.isEmpty()) {
-            trackHistory = new TrackHistory(trackUri);
-        } else {
-            trackHistory = trackHistories.get(0);
-        }
-
-        return trackHistory;
+        queueTrack(currentlyPlayingIndex + 1);
     }
 
     @Override
-    public void onError(Throwable throwable) {
-        Log.e(LOG_TAG, "Could not initialize player: " + throwable.getMessage());
-    }
+    public void onDetach() {
+        super.onDetach();
 
-    @Override
-    public void onLoggedIn() {
-        Log.d(LOG_TAG, "User logged in");
-    }
-
-    @Override
-    public void onLoggedOut() {
-        Log.d(LOG_TAG, "User logged out");
-    }
-
-    @Override
-    public void onTemporaryError() {
-        Log.d(LOG_TAG, "Temporary error occurred");
-    }
-
-    @Override
-    public void onNewCredentials(String s) {
-        Log.d(LOG_TAG, "User credentials blob received");
-    }
-
-    @Override
-    public void onConnectionMessage(String message) {
-        Log.d(LOG_TAG, "Received connection message: " + message);
-    }
-
-    @Override
-    public void onPause() {
-        player.pause();
-
-        super.onPause();
+        getActivity().unbindService(serviceConnection);
     }
 
     @Override
     public void onStop() {
-        Spotify.destroyPlayer(this);
-
         backgroundThread.interrupt();
         backgroundThread.quit();
 
@@ -410,5 +283,21 @@ public class MixFragment extends ListFragment implements
 
     public enum MixMode {
         RADIO, AWESOME;
+    }
+
+    public class SpotifyServiceConnection implements ServiceConnection {
+
+        @Override
+        public void onServiceConnected(ComponentName className,
+                                       IBinder service) {
+            spotifyBridge = (SpotifyService.SpotifyBridge) service;
+            spotifyBridge.setListener(MixFragment.this);
+            spotifyBridge.setAccessToken(getArguments().getString(EXTRA_ACCESS_TOKEN));
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName arg0) {
+            spotifyBridge = null;
+        }
     }
 }

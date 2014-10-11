@@ -2,9 +2,14 @@ package at.tomtasche.datmix.ui;
 
 import android.app.Activity;
 import android.app.ListFragment;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.IBinder;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
@@ -14,11 +19,8 @@ import android.widget.ArrayAdapter;
 import java.util.LinkedList;
 import java.util.List;
 
-import at.tomtasche.datmix.spotify.SpotifyBridge;
-import at.tomtasche.datmix.spotify.rest.Me;
-import at.tomtasche.datmix.spotify.rest.Paged;
+import at.tomtasche.datmix.service.SpotifyService;
 import at.tomtasche.datmix.spotify.rest.Playlist;
-import at.tomtasche.datmix.spotify.rest.SpotifyService;
 
 public class PlaylistsFragment extends ListFragment implements
         OnItemClickListener {
@@ -28,29 +30,24 @@ public class PlaylistsFragment extends ListFragment implements
     private Handler backgroundHandler;
     private Handler mainHandler;
 
-    private SpotifyBridge spotifyBridge;
-
     private PlaylistListener listener;
 
-    private List<String> playlistNames;
-    private List<String> playlistIds;
+    private List<Playlist> playlists;
 
-    private ArrayAdapter<String> adapter;
+    private ArrayAdapter<Playlist> adapter;
+
+    private ServiceConnection serviceConnection;
+    private SpotifyService.SpotifyBridge spotifyBridge;
 
     public static PlaylistsFragment newInstance(String accessToken) {
         PlaylistsFragment mixFragment = new PlaylistsFragment();
-
-        Bundle args = new Bundle();
-        args.putString(SpotifyBridge.EXTRA_ACCESS_TOKEN, accessToken);
-
-        mixFragment.setArguments(args);
-
         return mixFragment;
     }
 
     public PlaylistsFragment() {
-        playlistNames = new LinkedList<String>();
-        playlistIds = new LinkedList<String>();
+        playlists = new LinkedList<Playlist>();
+
+        serviceConnection = new SpotifyServiceConnection();
     }
 
     @Override
@@ -63,23 +60,12 @@ public class PlaylistsFragment extends ListFragment implements
         backgroundHandler = new Handler(backgroundThread.getLooper());
         mainHandler = new Handler();
 
-        spotifyBridge = new SpotifyBridge(getArguments());
-
         backgroundHandler.post(new Runnable() {
 
             @Override
             public void run() {
                 try {
-                    SpotifyService api = spotifyBridge.getApi();
-
-                    Me me = api.getMe();
-                    String userId = me.getId();
-
-                    Paged<Playlist[]> playlists = api.getPlaylists(userId);
-                    for (Playlist playlist : playlists.getItems()) {
-                        playlistNames.add(playlist.getName());
-                        playlistIds.add(playlist.getId());
-                    }
+                    playlists = spotifyBridge.getPlaylists();
 
                     if (adapter != null) {
                         mainHandler.post(new Runnable() {
@@ -103,9 +89,9 @@ public class PlaylistsFragment extends ListFragment implements
 
         getActivity().setTitle("Choose a playlist");
 
-        adapter = new ArrayAdapter<String>(getActivity(),
+        adapter = new ArrayAdapter<Playlist>(getActivity(),
                 android.R.layout.simple_list_item_1, android.R.id.text1,
-                playlistNames);
+                playlists);
 
         setListAdapter(adapter);
 
@@ -124,13 +110,23 @@ public class PlaylistsFragment extends ListFragment implements
             throw new IllegalArgumentException(
                     "activity must implement PlaylistListener");
         }
+
+        Intent intent = new Intent(getActivity(), SpotifyService.class);
+        getActivity().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
     }
 
     @Override
     public void onItemClick(AdapterView<?> parent, View view, int position,
                             long id) {
-        String playlistId = playlistIds.get(position);
-        listener.onPlaylistSelected(playlistId);
+        Playlist playlist = adapter.getItem(position);
+        listener.onPlaylistSelected(playlist.getId());
+    }
+
+    @Override
+    public void onDetach() {
+        super.onDetach();
+
+        getActivity().unbindService(serviceConnection);
     }
 
     @Override
@@ -143,5 +139,19 @@ public class PlaylistsFragment extends ListFragment implements
     public interface PlaylistListener {
 
         public void onPlaylistSelected(String playlistId);
+    }
+
+    public class SpotifyServiceConnection implements ServiceConnection {
+
+        @Override
+        public void onServiceConnected(ComponentName className,
+                                       IBinder service) {
+            spotifyBridge = (SpotifyService.SpotifyBridge) service;
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName arg0) {
+            spotifyBridge = null;
+        }
     }
 }

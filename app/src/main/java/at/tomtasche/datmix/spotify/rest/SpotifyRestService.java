@@ -10,7 +10,7 @@ import retrofit.http.POST;
 import retrofit.http.Path;
 import retrofit.http.Query;
 
-public interface SpotifyService {
+public interface SpotifyRestService {
 
     @GET("/artists/{album_id}/albums")
     Paged<Album[]> getAlbums(@Path("album_id") String artistId);
