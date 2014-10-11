@@ -24,7 +24,7 @@
             android:value="1" />
         <meta-data
             android:name="QUERY_LOG"
-            android:value="true" />
+            android:value="false" />
         <meta-data
             android:name="DOMAIN_PACKAGE_NAME"
             android:value="at.tomtasche.datmix" />
@@ -49,6 +49,8 @@
                     android:scheme="reddio-app" />
             </intent-filter>
         </activity>
+
+        <service android:name=".service.SpotifyService"></service>
     </application>
 
 </manifest>

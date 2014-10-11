@@ -54,7 +54,7 @@ public class SpotifyService extends Service implements PlayerNotificationCallbac
         RestAdapter restAdapter = new RestAdapter.Builder()
                 .setEndpoint("https://api.spotify.com/v1")
                 .setRequestInterceptor(new AccessTokenHeaderInterceptor(accessToken))
-                .setLogLevel(RestAdapter.LogLevel.FULL)
+                //.setLogLevel(RestAdapter.LogLevel.FULL)
                 .build();
 
         api = restAdapter.create(SpotifyRestService.class);
@@ -79,7 +79,7 @@ public class SpotifyService extends Service implements PlayerNotificationCallbac
     public synchronized void onPlaybackEvent(PlayerNotificationCallback.EventType eventType) {
         Log.d(LOG_TAG, "Playback event received: " + eventType.name());
 
-        if (eventType == PlayerNotificationCallback.EventType.TRACK_CHANGED) {
+        if (eventType == PlayerNotificationCallback.EventType.TRACK_CHANGED && bridgeListener != null) {
             bridgeListener.onTrackChanged();
         }
     }
@@ -121,20 +121,17 @@ public class SpotifyService extends Service implements PlayerNotificationCallbac
 
     public class SpotifyBridge extends Binder {
 
-        public void setListener(SpotifyBridgeListener bridgeListener) {
-            SpotifyService.this.bridgeListener = bridgeListener;
+        public void initialize(String accessToken) {
+            SpotifyService.this.initialize(accessToken);
         }
 
-        public void setAccessToken(String accessToken) {
-            initialize(accessToken);
+        public void setListener(SpotifyBridgeListener bridgeListener) {
+            SpotifyService.this.bridgeListener = bridgeListener;
         }
 
         public List<Playlist> getPlaylists() {
             Me me = api.getMe();
             String userId = me.getId();
-
-            List<String> playlistNames = new LinkedList<String>();
-            List<String> playlistIds = new LinkedList<String>();
 
             Paged<Playlist[]> playlists = api.getPlaylists(userId);
             return Arrays.asList(playlists.getItems());

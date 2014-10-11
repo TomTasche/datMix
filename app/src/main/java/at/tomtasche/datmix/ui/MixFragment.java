@@ -2,14 +2,9 @@ package at.tomtasche.datmix.ui;
 
 import android.app.Activity;
 import android.app.ListFragment;
-import android.content.ComponentName;
-import android.content.Context;
-import android.content.Intent;
-import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.IBinder;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -56,15 +51,13 @@ public class MixFragment extends ListFragment implements
     private View rootView;
     private TextView emptyTextView;
 
-    private ServiceConnection serviceConnection;
     private SpotifyService.SpotifyBridge spotifyBridge;
 
-    public static MixFragment newInstance(String accessToken,
-                                          String playlistId, MixMode mode) {
+    public static MixFragment newInstance(
+            String playlistId, MixMode mode) {
         MixFragment mixFragment = new MixFragment();
 
         Bundle args = new Bundle();
-        args.putString(EXTRA_ACCESS_TOKEN, accessToken);
         args.putString(EXTRA_PLAYLIST_ID, playlistId);
         args.putInt(EXTRA_MODE, mode.ordinal());
 
@@ -82,6 +75,14 @@ public class MixFragment extends ListFragment implements
     }
 
     @Override
+    public void onAttach(Activity activity) {
+        super.onAttach(activity);
+
+        spotifyBridge = ((MainActivity) activity).getSpotifyBridge();
+        spotifyBridge.setListener(this);
+    }
+
+    @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
@@ -95,38 +96,6 @@ public class MixFragment extends ListFragment implements
 
         int modeOrdinal = getArguments().getInt(EXTRA_MODE);
         mode = MixMode.values()[modeOrdinal];
-
-        backgroundHandler.post(new Runnable() {
-
-            @Override
-            public void run() {
-                try {
-                    // TODO: getTracksForPlaylist
-                    tracks = spotifyBridge.getTracksForPlaylist(playlistId);
-
-                    synchronized (lock) {
-                        if (!isUiReady) {
-                            lock.wait();
-                        }
-                    }
-
-                    mainHandler.post(new Runnable() {
-
-                        @Override
-                        public void run() {
-                            adapter.notifyDataSetChanged();
-
-                            emptyTextView.setVisibility(View.GONE);
-                            getListView().setVisibility(View.VISIBLE);
-                        }
-                    });
-                } catch (Exception e) {
-                    Log.e(LOG_TAG,
-                            "something went wrong fetching playlist with id "
-                                    + playlistId, e);
-                }
-            }
-        });
     }
 
     @Override
@@ -163,11 +132,39 @@ public class MixFragment extends ListFragment implements
     }
 
     @Override
-    public void onAttach(Activity activity) {
-        super.onAttach(activity);
+    public void onStart() {
+        super.onStart();
 
-        Intent intent = new Intent(getActivity(), SpotifyService.class);
-        getActivity().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+        backgroundHandler.post(new Runnable() {
+
+            @Override
+            public void run() {
+                try {
+                    tracks.addAll(spotifyBridge.getTracksForPlaylist(playlistId));
+
+                    synchronized (lock) {
+                        if (!isUiReady) {
+                            lock.wait();
+                        }
+                    }
+
+                    mainHandler.post(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            adapter.notifyDataSetChanged();
+
+                            emptyTextView.setVisibility(View.GONE);
+                            getListView().setVisibility(View.VISIBLE);
+                        }
+                    });
+                } catch (Exception e) {
+                    Log.e(LOG_TAG,
+                            "something went wrong fetching playlist with id "
+                                    + playlistId, e);
+                }
+            }
+        });
     }
 
     @Override
@@ -267,37 +264,21 @@ public class MixFragment extends ListFragment implements
     }
 
     @Override
-    public void onDetach() {
-        super.onDetach();
+    public void onStop() {
+        super.onStop();
 
-        getActivity().unbindService(serviceConnection);
+        backgroundThread.interrupt();
+        backgroundThread.quit();
     }
 
     @Override
-    public void onStop() {
-        backgroundThread.interrupt();
-        backgroundThread.quit();
+    public void onDetach() {
+        super.onDetach();
 
-        super.onStop();
+        spotifyBridge.setListener(null);
     }
 
     public enum MixMode {
         RADIO, AWESOME;
-    }
-
-    public class SpotifyServiceConnection implements ServiceConnection {
-
-        @Override
-        public void onServiceConnected(ComponentName className,
-                                       IBinder service) {
-            spotifyBridge = (SpotifyService.SpotifyBridge) service;
-            spotifyBridge.setListener(MixFragment.this);
-            spotifyBridge.setAccessToken(getArguments().getString(EXTRA_ACCESS_TOKEN));
-        }
-
-        @Override
-        public void onServiceDisconnected(ComponentName arg0) {
-            spotifyBridge = null;
-        }
     }
 }

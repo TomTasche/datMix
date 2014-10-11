@@ -10,4 +10,9 @@ public class PlaylistTrack {
     public Track getTrack() {
         return track;
     }
+
+    @Override
+    public String toString() {
+        return track.getName();
+    }
 }

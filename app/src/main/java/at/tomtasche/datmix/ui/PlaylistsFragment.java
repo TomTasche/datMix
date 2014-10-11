@@ -2,14 +2,9 @@ package at.tomtasche.datmix.ui;
 
 import android.app.Activity;
 import android.app.ListFragment;
-import android.content.ComponentName;
-import android.content.Context;
-import android.content.Intent;
-import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.IBinder;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
@@ -36,18 +31,29 @@ public class PlaylistsFragment extends ListFragment implements
 
     private ArrayAdapter<Playlist> adapter;
 
-    private ServiceConnection serviceConnection;
     private SpotifyService.SpotifyBridge spotifyBridge;
 
-    public static PlaylistsFragment newInstance(String accessToken) {
+    public static PlaylistsFragment newInstance() {
         PlaylistsFragment mixFragment = new PlaylistsFragment();
         return mixFragment;
     }
 
     public PlaylistsFragment() {
         playlists = new LinkedList<Playlist>();
+    }
 
-        serviceConnection = new SpotifyServiceConnection();
+    @Override
+    public void onAttach(Activity activity) {
+        super.onAttach(activity);
+
+        if (activity instanceof PlaylistListener) {
+            listener = (PlaylistListener) activity;
+        } else {
+            throw new IllegalArgumentException(
+                    "activity must implement PlaylistListener");
+        }
+
+        spotifyBridge = ((MainActivity) activity).getSpotifyBridge();
     }
 
     @Override
@@ -59,28 +65,6 @@ public class PlaylistsFragment extends ListFragment implements
 
         backgroundHandler = new Handler(backgroundThread.getLooper());
         mainHandler = new Handler();
-
-        backgroundHandler.post(new Runnable() {
-
-            @Override
-            public void run() {
-                try {
-                    playlists = spotifyBridge.getPlaylists();
-
-                    if (adapter != null) {
-                        mainHandler.post(new Runnable() {
-
-                            @Override
-                            public void run() {
-                                adapter.notifyDataSetChanged();
-                            }
-                        });
-                    }
-                } catch (Exception e) {
-                    Log.e("spoti", "something went wrong!", e);
-                }
-            }
-        });
     }
 
     @Override
@@ -101,18 +85,31 @@ public class PlaylistsFragment extends ListFragment implements
     }
 
     @Override
-    public void onAttach(Activity activity) {
-        super.onAttach(activity);
+    public void onStart() {
+        super.onStart();
 
-        if (activity instanceof PlaylistListener) {
-            listener = (PlaylistListener) activity;
-        } else {
-            throw new IllegalArgumentException(
-                    "activity must implement PlaylistListener");
-        }
+        backgroundHandler.post(new Runnable() {
 
-        Intent intent = new Intent(getActivity(), SpotifyService.class);
-        getActivity().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+            @Override
+            public void run() {
+                try {
+                    playlists.clear();
+                    playlists.addAll(spotifyBridge.getPlaylists());
+
+                    if (adapter != null) {
+                        mainHandler.post(new Runnable() {
+
+                            @Override
+                            public void run() {
+                                adapter.notifyDataSetChanged();
+                            }
+                        });
+                    }
+                } catch (Exception e) {
+                    Log.e("spoti", "something went wrong!", e);
+                }
+            }
+        });
     }
 
     @Override
@@ -123,35 +120,15 @@ public class PlaylistsFragment extends ListFragment implements
     }
 
     @Override
-    public void onDetach() {
-        super.onDetach();
-
-        getActivity().unbindService(serviceConnection);
-    }
-
-    @Override
     public void onStop() {
         super.onStop();
 
+        backgroundThread.interrupt();
         backgroundThread.quit();
     }
 
     public interface PlaylistListener {
 
         public void onPlaylistSelected(String playlistId);
-    }
-
-    public class SpotifyServiceConnection implements ServiceConnection {
-
-        @Override
-        public void onServiceConnected(ComponentName className,
-                                       IBinder service) {
-            spotifyBridge = (SpotifyService.SpotifyBridge) service;
-        }
-
-        @Override
-        public void onServiceDisconnected(ComponentName arg0) {
-            spotifyBridge = null;
-        }
     }
 }
